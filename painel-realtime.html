@@ -211,7 +211,9 @@ async function load(){
       .select('*,tasks(*,findings(*),observations(*))')
       .order('code');
     if(error)throw error;
-    render(data||[]);
+    // Ignorar aeronaves sem nenhuma tarefa
+    const filtrado=(data||[]).filter(ac=>(ac.tasks||[]).length>0);
+    render(filtrado);
     setConn(true);
   }catch(e){
     setConn(false);
@@ -626,14 +628,17 @@ async function importar(ev){
     }
     await sb.from('tasks').delete().neq('id','00000000-0000-0000-0000-000000000000');
     await sb.from('aircrafts').delete().neq('id','00000000-0000-0000-0000-000000000000');
-    for(const ac of Object.values(acMap)){
+    const aerosFiltradas = Object.values(acMap).filter(ac=>ac.tasks.length>0);
+    const aerosIgnoradas = Object.values(acMap).filter(ac=>ac.tasks.length===0).map(ac=>ac.code);
+    for(const ac of aerosFiltradas){
       const{data:ins}=await sb.from('aircrafts').insert([{code:ac.code,technician:ac.technician}]).select();
-      if(ins?.[0]&&ac.tasks.length)
+      if(ins?.[0])
         await sb.from('tasks').insert(ac.tasks.map(t=>({aircraft_id:ins[0].id,wo_number:t.wo_number,task_code:t.task_code||null,description:t.description})));
     }
     await load();
-    const tot=Object.values(acMap).reduce((s,a)=>s+a.tasks.length,0);
-    alert(`✅ Importado!\n${Object.keys(acMap).length} aeronaves · ${tot} tarefas`);
+    const tot=aerosFiltradas.reduce((s,a)=>s+a.tasks.length,0);
+    const ignoradasMsg=aerosIgnoradas.length?`\n⚠️ Ignoradas (sem WO): ${aerosIgnoradas.join(', ')}`:'';
+    alert(`✅ Importado!\n${aerosFiltradas.length} aeronaves · ${tot} tarefas${ignoradasMsg}`);
   }catch(err){console.error(err);alert('❌ Erro: '+err.message);await load();}
   ev.target.value='';
 }

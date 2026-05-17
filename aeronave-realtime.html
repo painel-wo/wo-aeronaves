@@ -226,12 +226,14 @@ async function carregarAeronaves() {
     const {data,error} = await sb.from('aircrafts')
       .select('*, tasks(*, observations(*))').order('code');
     if (error) throw error;
-    if (!data.length) {
-      list.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:2rem">Nenhuma aeronave.<br>Importe um Excel no painel.</p>';
+    // Filtrar aeronaves sem tarefas
+    const comTarefas = (data||[]).filter(ac=>(ac.tasks||[]).length>0);
+    if (!comTarefas.length) {
+      list.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:2rem">Nenhuma aeronave com WO.<br>Importe um Excel no painel.</p>';
       return;
     }
     list.innerHTML = '';
-    data.forEach(ac => {
+    comTarefas.forEach(ac => {
       const tasks   = ac.tasks || [];
       const done    = tasks.filter(t=>t.completed).length;
       const deferred= tasks.filter(t=>t.deferred).length;
