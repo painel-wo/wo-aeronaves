@@ -614,7 +614,14 @@ async function importar(ev){
         if(!reAC.test(col0))return;
         const isHeader=col3.toUpperCase()==='PRIORIDADE'||col1.toUpperCase().includes('BOX')||col1.includes('|');
         if(isHeader){
-          if(col2&&col2.toUpperCase()!=='PRIORIDADE')tecnicoAtual=col2;
+          // Validar técnico: não pode conter datas, '|', 'BOX', ou ser só números
+          const tecValido=col2&&
+            col2.toUpperCase()!=='PRIORIDADE'&&
+            !col2.includes('|')&&
+            !col2.toUpperCase().includes('BOX')&&
+            !/^\d/.test(col2.trim())&&
+            col2.trim().length>1;
+          if(tecValido)tecnicoAtual=col2.trim();
           if(!acMap[col0])acMap[col0]={code:col0,technician:tecnicoAtual,tasks:[]};
           else acMap[col0].technician=tecnicoAtual;
           return;
