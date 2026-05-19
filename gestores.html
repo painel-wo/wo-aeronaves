@@ -504,16 +504,44 @@ function toggleHist(id){
   if(el)el.classList.toggle('open');
 }
 
-// REALTIME
+// REALTIME com DEBOUNCE + FALLBACK POLLING
+let debounceT=null, debounceH=null;
+
+function debouncedLoadTurno(){
+  clearTimeout(debounceT);
+  debounceT=setTimeout(loadTurno, 300);
+}
+
+function debouncedLoadHistorico(){
+  clearTimeout(debounceH);
+  debounceH=setTimeout(loadHistorico, 300);
+}
+
 sb.channel('gestores-rt')
-  .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},loadTurno)
-  .on('postgres_changes',{event:'*',schema:'public',table:'aircrafts'},loadTurno)
-  .on('postgres_changes',{event:'*',schema:'public',table:'findings'},loadTurno)
-  .on('postgres_changes',{event:'*',schema:'public',table:'turnos'},loadHistorico)
+  .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},debouncedLoadTurno)
+  .on('postgres_changes',{event:'*',schema:'public',table:'aircrafts'},debouncedLoadTurno)
+  .on('postgres_changes',{event:'*',schema:'public',table:'findings'},debouncedLoadTurno)
+  .on('postgres_changes',{event:'*',schema:'public',table:'turnos'},debouncedLoadHistorico)
   .subscribe(s=>{
     setConn(s==='SUBSCRIBED');
     realtimeOkG=(s==='SUBSCRIBED');
   });
+
+// Polling inteligente: se Realtime cair, atualiza a cada 15s
+setInterval(()=>{
+  if(!realtimeOkG){
+    debouncedLoadTurno();
+    debouncedLoadHistorico();
+  }
+}, 15000);
+
+// Recarregar ao voltar para a aba
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible'){
+    loadTurno();
+    loadHistorico();
+  }
+});
 
 loadTurno();
 loadHistorico();
