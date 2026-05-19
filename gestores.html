@@ -253,10 +253,17 @@ async function loadTurno(){
   try{
     const{data,error}=await sb.from('aircrafts')
       .select('*,tasks(*,findings(*))').order('code');
-    if(error)throw error;
+    if(error){
+      console.error('❌ loadTurno erro:', error);
+      setConn(false);
+      return;
+    }
     renderTurno(data||[]);
     setConn(true);
-  }catch(e){setConn(false);}
+  }catch(e){
+    console.error('❌ loadTurno exception:', e);
+    setConn(false);
+  }
 }
 
 function renderTurno(data){
