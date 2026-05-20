@@ -59,8 +59,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 .ac-row:hover td{background:#162032}
 .ac-row.finding td{background:#1a0a0a}
 .ac-row.finding:hover td{background:#200d0d}
-.ac-row.ac-concluida td{opacity:.4}
-.ac-row.ac-concluida:hover td{opacity:.7}
 .arrow{font-size:10px;color:#475569;display:inline-block;transition:transform .25s;margin-right:6px}
 .arrow.open{transform:rotate(90deg)}
 .ac-code{font-weight:500;font-size:13px;color:#93c5fd;letter-spacing:.5px}
@@ -80,8 +78,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 .b-finding{background:#450a0a;color:#f87171;animation:blink 1.5s infinite;border:0.5px solid #7f1d1d}
 .b-obs{background:#1e3a5f;color:#60a5fa;border:0.5px solid #1e3a8a}
 .b-deferred{background:#422006;color:#fcd34d;border:0.5px solid #92400e}
-.b-iio{background:#3b0764;color:#d8b4fe;animation:blink 1.5s infinite;border:0.5px solid #6b21a8}
-.b-runap{background:#164e63;color:#a5f3fc;animation:blink 1.5s infinite;border:0.5px solid #0e7490}
 .mtl{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10px;font-weight:500}
 .mtl-ok{background:#052e16;color:#4ade80}
 .mtl-nhe{background:#422006;color:#fbbf24}
@@ -202,6 +198,10 @@ const URL_='https://owyohcqjyiqhabonnstq.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93eW9oY3FqeWlxaGFib25uc3RxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjMxMzksImV4cCI6MjA5MzczOTEzOX0.nRpYEt7bZdJXCCyVKM5wZQOdo1DOH8oQIEu_swRizIA';
 const sb=window.supabase.createClient(URL_,KEY);
 
+// Heartbeat: mantém o projeto Supabase ativo (evita pausa por inatividade)
+async function heartbeat(){try{await sb.from('aircrafts').select('id',{count:'exact',head:true});}catch(e){}}
+heartbeat();
+
 // Estado dos painéis abertos
 const openPanels = new Set();
 
@@ -213,9 +213,7 @@ async function load(){
       .select('*,tasks(*,findings(*),observations(*))')
       .order('code');
     if(error)throw error;
-    // Ignorar aeronaves sem nenhuma tarefa
-    const filtrado=(data||[]).filter(ac=>(ac.tasks||[]).length>0);
-    render(filtrado);
+    render(data||[]);
     setConn(true);
   }catch(e){
     setConn(false);
@@ -231,16 +229,9 @@ function render(data){
     stats(0,0,0,0,0,0,0,0);return;
   }
 
-  // Ordenar: abertas primeiro, concluídas/deferidas por último
-  const dataOrdenada=[...data].sort((a,b)=>{
-    const aConc=(a.tasks||[]).length>0&&(a.tasks||[]).every(t=>t.completed||t.deferred)?1:0;
-    const bConc=(b.tasks||[]).length>0&&(b.tasks||[]).every(t=>t.completed||t.deferred)?1:0;
-    return aConc-bConc;
-  });
-
   let tAC=data.length,tWO=0,dWO=0,sWO=0,fAC=0,tWOunicas=0,tDef=0,tObs=0;
 
-  const html=dataOrdenada.map(ac=>{
+  const html=data.map(ac=>{
     const tasks=ac.tasks||[];
     const done=tasks.filter(t=>t.completed).length;
     const deferred=tasks.filter(t=>t.deferred).length;
@@ -261,13 +252,8 @@ function render(data){
     let mb=null; for(const m of mo){if(mv.includes(m)){mb=m;break;}}
     const mh=mb==='OK'?`<span class="mtl mtl-ok">OK</span>`:mb==='NHE'?`<span class="mtl mtl-nhe">NHE</span>`:mb==='TST'?`<span class="mtl mtl-tst">TST</span>`:`<span class="mtl mtl-nd">—</span>`;
 
-    const acIIO   = tasks.some(t=>t.has_iio);
-    const acRunap = tasks.some(t=>t.has_runap);
-
     let sh;
-    if(hasFind) sh=`<span class="badge b-finding">⚠ Finding!</span>`;
-    else if(acIIO)   sh=`<span class="badge b-iio">🔍 IIO!</span>`;
-    else if(acRunap) sh=`<span class="badge b-runap">✈ Run-up!</span>`;
+    if(hasFind)sh=`<span class="badge b-finding">⚠ Finding!</span>`;
     else if(pct===100)sh=`<span class="badge b-done">✓ Concluída</span>`;
     else if(started>0||done>0)sh=`<span class="badge b-started">▶ Andamento</span>`;
     else sh=`<span class="badge b-pending">Aguardando</span>`;
@@ -288,8 +274,6 @@ function render(data){
       const algumDeferido=woTasks.some(t=>t.deferred);
       const algumFind=woTasks.some(t=>t.has_finding||(t.findings||[]).some(f=>!f.resolved));
       const algumStarted=woTasks.some(t=>t.started&&!t.completed&&!t.deferred);
-      const woIIO=woTasks.some(t=>t.has_iio);
-      const woRunap=woTasks.some(t=>t.has_runap);
       const doneCnt=woTasks.filter(t=>t.completed).length;
       const defCnt=woTasks.filter(t=>t.deferred).length;
 
@@ -300,9 +284,6 @@ function render(data){
         :algumFind?`<span class="badge b-finding" style="font-size:9px;padding:2px 7px;animation:none">⚠ Finding</span>`
         :algumStarted?`<span class="badge b-started" style="font-size:9px;padding:2px 7px">▶ Andamento</span>`
         :`<span class="badge b-pending" style="font-size:9px;padding:2px 7px">Aguardando</span>`;
-
-      const iioTag  = woIIO  ? `<span class="badge b-iio"  style="font-size:9px;padding:2px 7px">🔍 IIO</span>`  : '';
-      const runapTag= woRunap? `<span class="badge b-runap" style="font-size:9px;padding:2px 7px">✈ Run-up</span>` : '';
 
       // Listar cada sub-tarefa com obs
       const subTarefas=woTasks.map(task=>{
@@ -346,7 +327,7 @@ function render(data){
       return `<div class="task-item" style="background:${algumFind?'#180808':'transparent'}">
         <div class="task-header">
           <span class="task-wo-num">WO ${woNum}</span>
-          ${woSt}${iioTag}${runapTag}
+          ${woSt}
           <span style="font-size:10px;color:#475569">${doneCnt}/${woTasks.length} tarefa${woTasks.length!==1?'s':''}</span>
         </div>
         ${subTarefas}
@@ -355,11 +336,10 @@ function render(data){
 
 
 
-    const acConcluida=tasks.length>0&&tasks.every(t=>t.completed||t.deferred);
     const acObs=tasks.filter(t=>(t.observations||[]).length>0).length;
 
     return `
-    <tr class="ac-row ${hasFind?'finding':''} ${acConcluida?'ac-concluida':''}" onclick="toggleDetail('${ac.id}')">
+    <tr class="ac-row ${hasFind?'finding':''}" onclick="toggleDetail('${ac.id}')">
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="arrow ${isOpen?'open':''}" id="arrow-${ac.id}">▶</span>
@@ -624,14 +604,7 @@ async function importar(ev){
         if(!reAC.test(col0))return;
         const isHeader=col3.toUpperCase()==='PRIORIDADE'||col1.toUpperCase().includes('BOX')||col1.includes('|');
         if(isHeader){
-          // Validar técnico: não pode conter datas, '|', 'BOX', ou ser só números
-          const tecValido=col2&&
-            col2.toUpperCase()!=='PRIORIDADE'&&
-            !col2.includes('|')&&
-            !col2.toUpperCase().includes('BOX')&&
-            !/^\d/.test(col2.trim())&&
-            col2.trim().length>1;
-          if(tecValido)tecnicoAtual=col2.trim();
+          if(col2&&col2.toUpperCase()!=='PRIORIDADE')tecnicoAtual=col2;
           if(!acMap[col0])acMap[col0]={code:col0,technician:tecnicoAtual,tasks:[]};
           else acMap[col0].technician=tecnicoAtual;
           return;
@@ -645,17 +618,14 @@ async function importar(ev){
     }
     await sb.from('tasks').delete().neq('id','00000000-0000-0000-0000-000000000000');
     await sb.from('aircrafts').delete().neq('id','00000000-0000-0000-0000-000000000000');
-    const aerosFiltradas = Object.values(acMap).filter(ac=>ac.tasks.length>0);
-    const aerosIgnoradas = Object.values(acMap).filter(ac=>ac.tasks.length===0).map(ac=>ac.code);
-    for(const ac of aerosFiltradas){
+    for(const ac of Object.values(acMap)){
       const{data:ins}=await sb.from('aircrafts').insert([{code:ac.code,technician:ac.technician}]).select();
-      if(ins?.[0])
+      if(ins?.[0]&&ac.tasks.length)
         await sb.from('tasks').insert(ac.tasks.map(t=>({aircraft_id:ins[0].id,wo_number:t.wo_number,task_code:t.task_code||null,description:t.description})));
     }
     await load();
-    const tot=aerosFiltradas.reduce((s,a)=>s+a.tasks.length,0);
-    const ignoradasMsg=aerosIgnoradas.length?`\n⚠️ Ignoradas (sem WO): ${aerosIgnoradas.join(', ')}`:'';
-    alert(`✅ Importado!\n${aerosFiltradas.length} aeronaves · ${tot} tarefas${ignoradasMsg}`);
+    const tot=Object.values(acMap).reduce((s,a)=>s+a.tasks.length,0);
+    alert(`✅ Importado!\n${Object.keys(acMap).length} aeronaves · ${tot} tarefas`);
   }catch(err){console.error(err);alert('❌ Erro: '+err.message);await load();}
   ev.target.value='';
 }
@@ -775,8 +745,6 @@ async function salvarTurno(){
           descricao:task.description,
           concluida:task.completed||false,
           has_finding:task.has_finding||false,
-          has_iio:task.has_iio||false,
-          has_runap:task.has_runap||false,
           deferida:task.deferred||false,
           defer_reason:task.defer_reason||null,
           material:task.material,
@@ -850,11 +818,10 @@ function tocarAlerta(){
 
 function verificarNovosFindings(data){
   if(primeiroLoad){
+    // No primeiro load só registra os findings existentes, não alerta
     data.forEach(ac=>(ac.tasks||[]).forEach(t=>{
       if(t.has_finding||(t.findings||[]).some(f=>!f.resolved))
-        findingsConhecidos.add(t.id+'-find');
-      if(t.has_iio)   findingsConhecidos.add(t.id+'-iio');
-      if(t.has_runap) findingsConhecidos.add(t.id+'-runap');
+        findingsConhecidos.add(t.id);
     }));
     primeiroLoad = false;
     return;
@@ -862,20 +829,11 @@ function verificarNovosFindings(data){
   let novo = false;
   data.forEach(ac=>(ac.tasks||[]).forEach(t=>{
     const temFind = t.has_finding||(t.findings||[]).some(f=>!f.resolved);
-    if(temFind && !findingsConhecidos.has(t.id+'-find')){
-      findingsConhecidos.add(t.id+'-find'); novo = true;
+    if(temFind && !findingsConhecidos.has(t.id)){
+      findingsConhecidos.add(t.id);
+      novo = true;
     }
-    if(!temFind) findingsConhecidos.delete(t.id+'-find');
-
-    if(t.has_iio && !findingsConhecidos.has(t.id+'-iio')){
-      findingsConhecidos.add(t.id+'-iio'); novo = true;
-    }
-    if(!t.has_iio) findingsConhecidos.delete(t.id+'-iio');
-
-    if(t.has_runap && !findingsConhecidos.has(t.id+'-runap')){
-      findingsConhecidos.add(t.id+'-runap'); novo = true;
-    }
-    if(!t.has_runap) findingsConhecidos.delete(t.id+'-runap');
+    if(!temFind) findingsConhecidos.delete(t.id);
   }));
   if(novo) tocarAlerta();
 }
