@@ -63,6 +63,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 .act.find-btn{background:#fee2e2;color:#991b1b;border-color:#fecaca}
 .act.defer-btn{background:#fef3c7;color:#92400e;border-color:#fde68a}
 .act.obs-btn{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+.act.reset-btn{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
 
 /* MTL */
 .mtl-section{padding:0 .875rem .625rem}
@@ -191,10 +192,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 const URL_ = 'https://owyohcqjyiqhabonnstq.supabase.co';
 const KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93eW9oY3FqeWlxaGFib25uc3RxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjMxMzksImV4cCI6MjA5MzczOTEzOX0.nRpYEt7bZdJXCCyVKM5wZQOdo1DOH8oQIEu_swRizIA';
 const sb = window.supabase.createClient(URL_, KEY);
-
-// Heartbeat: mantém o projeto Supabase ativo (evita pausa por inatividade)
-async function heartbeat(){try{await sb.from('aircrafts').select('id',{count:'exact',head:true});}catch(e){}}
-heartbeat();
 
 let curAC = null;        // {id, code, technician}
 let findingTaskId = null;
@@ -355,6 +352,7 @@ function renderTasks(tasks) {
         <button class="act find-btn" ${task.completed||isDef?'disabled':''} onclick="abrirFinding('${task.id}')">⚠ Finding</button>
         <button class="act defer-btn" ${task.completed||isDef?'disabled':''} onclick="abrirDefer('${task.id}')">⏸ Diferir</button>
         <button class="act obs-btn" onclick="abrirObs('${task.id}')">📝 Obs ${obs.length?`(${obs.length})`:''}</button>
+        ${task.started&&!task.completed&&!isDef ? `<button class="act reset-btn" onclick="resetarInicio('${task.id}')">↩️ Desfazer Início</button>` : ''}
         ${hasFind ? `<button class="act" style="grid-column:1/-1;background:#dcfce7;color:#166534;border-color:#bbf7d0;font-size:12px" onclick="resolverFinding('${task.id}')">✅ Resolver Finding</button>` : ''}
       </div>
 
@@ -540,6 +538,18 @@ async function confirmarDefer() {
     recorded_at: hora
   }]);
   fecharModalDefer();
+  await carregarTasks();
+}
+
+// ─── RESETAR INÍCIO ─────────────────────────────────────────
+async function resetarInicio(taskId) {
+  if (!confirm('⚠️ Desfazer o início desta tarefa?\n\nIsso vai remover o status "Iniciada" e você poderá iniciá-la novamente.')) return;
+  
+  await sb.from('tasks').update({
+    started: false,
+    started_at: null
+  }).eq('id', taskId);
+  
   await carregarTasks();
 }
 
