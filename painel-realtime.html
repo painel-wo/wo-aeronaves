@@ -606,7 +606,10 @@ async function importar(ev){
         if(!reAC.test(col0))return;
         const isHeader=col3.toUpperCase()==='PRIORIDADE'||col1.toUpperCase().includes('BOX')||col1.includes('|');
         if(isHeader){
-          if(col2&&col2.toUpperCase()!=='PRIORIDADE')tecnicoAtual=col2;
+          if(col2&&col2.toUpperCase()!=='PRIORIDADE'){
+            // Remover "box" do início do nome (case insensitive)
+            tecnicoAtual=col2.replace(/^box\s*/i,'').trim()||'Não atribuído';
+          }
           if(!acMap[col0])acMap[col0]={code:col0,technician:tecnicoAtual,tasks:[]};
           else acMap[col0].technician=tecnicoAtual;
           return;
