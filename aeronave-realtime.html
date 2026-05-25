@@ -309,7 +309,16 @@ function renderTasks(tasks) {
       ${isStarted ? '✓ Trabalho iniciado' : '▶ Iniciar trabalho na aeronave'}
     </button>`;
 
-  const cardsHtml = tasks.map(task => {
+  // ORDENAÇÃO: Tarefas abertas primeiro, concluídas/deferidas depois
+  const tasksSorted = tasks.sort((a,b)=>{
+    const aDone = a.completed || a.deferred;
+    const bDone = b.completed || b.deferred;
+    if(aDone && !bDone) return 1;  // a concluída vai para baixo
+    if(!aDone && bDone) return -1; // b concluída vai para baixo
+    return 0; // mesma categoria: manter ordem
+  });
+
+  const cardsHtml = tasksSorted.map(task => {
     const hasFind = task.has_finding || (task.findings||[]).some(f=>!f.resolved);
     const isDef = task.deferred;
     const cls = task.completed ? 'completed' : isDef ? 'deferred' : hasFind ? 'finding' : '';
