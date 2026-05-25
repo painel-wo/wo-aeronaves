@@ -542,7 +542,20 @@ function parsePDFPernoite(linhas){
     // Linha cabeçalho — contém "PRIORIDADE T H" e "COD"
     if(restoStr.includes('PRIORIDADE')&&restoStr.includes('COD')){
       const pIdx=restoStr.indexOf('PRIORIDADE');
-      const tecnico=restoStr.slice(0,pIdx).trim()||'—';
+      let tecnico=restoStr.slice(0,pIdx).trim();
+      
+      // Procurar por "BOX" para extrair apenas os nomes dos técnicos
+      const boxIdx=tecnico.toUpperCase().indexOf('BOX');
+      if(boxIdx>=0){
+        tecnico=tecnico.slice(boxIdx+3).trim(); // Remove "BOX" e tudo antes
+      } else {
+        // Remove datas, pipes e outros caracteres indesejados do início
+        tecnico=tecnico.replace(/^[\d\/\s\|:-]+/,'').trim();
+      }
+      
+      // Remove "box" do início se ainda existir (case insensitive)
+      tecnico=tecnico.replace(/^box\s*/i,'').trim()||'—';
+      
       if(!map[ac])map[ac]={code:ac,technician:tecnico,tasks:[]};
       else map[ac].technician=tecnico;
       return;
