@@ -239,9 +239,18 @@ function render(data){
     stats(0,0,0,0,0,0,0,0);return;
   }
 
-  let tAC=data.length,tWO=0,dWO=0,sWO=0,fAC=0,tWOunicas=0,tDef=0,tObs=0;
+  // ORDENAÇÃO NÍVEL 1: Aeronaves abertas primeiro, concluídas depois
+  const dataSorted = data.sort((a,b)=>{
+    const aDone = (a.tasks||[]).every(t=>t.completed||t.deferred);
+    const bDone = (b.tasks||[]).every(t=>t.completed||t.deferred);
+    if(aDone && !bDone) return 1;  // a concluída vai para baixo
+    if(!aDone && bDone) return -1; // b concluída vai para baixo
+    return a.code.localeCompare(b.code); // mesma categoria: ordem alfabética
+  });
 
-  const html=data.map(ac=>{
+  let tAC=dataSorted.length,tWO=0,dWO=0,sWO=0,fAC=0,tWOunicas=0,tDef=0,tObs=0;
+
+  const html=dataSorted.map(ac=>{
     const tasks=ac.tasks||[];
     const done=tasks.filter(t=>t.completed).length;
     const deferred=tasks.filter(t=>t.deferred).length;
@@ -278,7 +287,18 @@ function render(data){
       woGrupos[task.wo_number].push(task);
     });
 
-    const detailHtml=Object.entries(woGrupos).map(([woNum, woTasks])=>{
+    // ORDENAÇÃO NÍVEL 2: WOs abertas primeiro, concluídas depois
+    const woEntries = Object.entries(woGrupos).sort((a,b)=>{
+      const [,aTasks] = a;
+      const [,bTasks] = b;
+      const aDone = aTasks.every(t=>t.completed||t.deferred);
+      const bDone = bTasks.every(t=>t.completed||t.deferred);
+      if(aDone && !bDone) return 1;  // a concluída vai para baixo
+      if(!aDone && bDone) return -1; // b concluída vai para baixo
+      return a[0].localeCompare(b[0]); // mesma categoria: ordem alfabética do WO
+    });
+
+    const detailHtml=woEntries.map(([woNum, woTasks])=>{
       // Status geral do grupo: concluído só se todas concluídas
       const todoConcluido=woTasks.every(t=>t.completed||t.deferred);
       const algumDeferido=woTasks.some(t=>t.deferred);
@@ -295,8 +315,17 @@ function render(data){
         :algumStarted?`<span class="badge b-started" style="font-size:9px;padding:2px 7px">▶ Andamento</span>`
         :`<span class="badge b-pending" style="font-size:9px;padding:2px 7px">Aguardando</span>`;
 
+      // ORDENAÇÃO NÍVEL 3: Tarefas abertas primeiro, concluídas depois
+      const woTasksSorted = woTasks.sort((a,b)=>{
+        const aDone = a.completed || a.deferred;
+        const bDone = b.completed || b.deferred;
+        if(aDone && !bDone) return 1;  // a concluída vai para baixo
+        if(!aDone && bDone) return -1; // b concluída vai para baixo
+        return 0; // mesma categoria: manter ordem original
+      });
+
       // Listar cada sub-tarefa com obs
-      const subTarefas=woTasks.map(task=>{
+      const subTarefas=woTasksSorted.map(task=>{
         const obs=(task.observations||[]).sort((a,b)=>(a.recorded_at||'').localeCompare(b.recorded_at||''));
         const finds=(task.findings||[]);
         const tDone=task.completed;
