@@ -34,6 +34,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 .kpi.blue .kpi-n{color:#60a5fa}
 .kpi.blue{border-color:#1e3a5f}
 
+/* ALERTA 5H */
+.alert-banner{background:#7f1d1d;border:2px solid #991b1b;border-radius:10px;margin:0 0 1rem 0;padding:12px 20px;display:flex;align-items:center;justify-content:center;gap:12px;animation:blink 1.5s infinite}
+.alert-banner-text{color:#fca5a5;font-size:16px;font-weight:600;letter-spacing:.5px}
+.alert-banner-count{color:#fff;font-size:20px;font-weight:700}
+
 /* SUMMARY */
 .summary{display:flex;gap:1.5rem;margin-bottom:1.25rem;padding:10px 16px;background:#1e293b;border-radius:8px;border:0.5px solid #334155;flex-wrap:wrap}
 .sum-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#94a3b8}
@@ -62,6 +67,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 .arrow{font-size:10px;color:#475569;display:inline-block;transition:transform .25s;margin-right:6px}
 .arrow.open{transform:rotate(90deg)}
 .ac-code{font-weight:500;font-size:13px;color:#93c5fd;letter-spacing:.5px}
+.ac-code.alert{animation:pulse-orange 1.5s infinite;color:#fb923c}
+.ac-code.urgent{animation:pulse-red 1s infinite;color:#ef4444;font-weight:600}
+@keyframes pulse-orange{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes pulse-red{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.05)}}
 .ac-tech{font-size:10px;color:#64748b}
 .wo-count{font-size:11px;color:#94a3b8}
 .wo-list{font-size:10px;color:#64748b;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -78,6 +87,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 .b-finding{background:#450a0a;color:#f87171;animation:blink 1.5s infinite;border:0.5px solid #7f1d1d}
 .b-obs{background:#1e3a5f;color:#60a5fa;border:0.5px solid #1e3a8a}
 .b-deferred{background:#422006;color:#fcd34d;border:0.5px solid #92400e}
+.b-urgent{background:#7f1d1d;color:#fca5a5;animation:blink 1.5s infinite;border:0.5px solid #991b1b;font-weight:600}
 .mtl{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10px;font-weight:500}
 .mtl-ok{background:#052e16;color:#4ade80}
 .mtl-nhe{background:#422006;color:#fbbf24}
@@ -165,6 +175,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
     <div class="kpi"><div class="kpi-n" id="k-pct">—</div><div class="kpi-l">Progresso</div></div>
   </div>
 
+  <!-- ALERTA 5H -->
+  <div class="alert-banner" id="alert-5h" style="display:none">
+    <span class="alert-banner-text">⏰ ALERTA 5H DA MANHÃ —</span>
+    <span class="alert-banner-count" id="alert-count">0</span>
+    <span class="alert-banner-text">AERONAVE(S) COM WO ABERTA</span>
+  </div>
+
   <div class="summary">
     <div class="sum-item"><div class="sum-dot" style="background:#10b981"></div><span id="s-done">—</span></div>
     <div class="sum-item"><div class="sum-dot" style="background:#fbbf24"></div><span id="s-and">—</span></div>
@@ -198,18 +215,6 @@ const URL_='https://owyohcqjyiqhabonnstq.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93eW9oY3FqeWlxaGFib25uc3RxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjMxMzksImV4cCI6MjA5MzczOTEzOX0.nRpYEt7bZdJXCCyVKM5wZQOdo1DOH8oQIEu_swRizIA';
 const sb=window.supabase.createClient(URL_,KEY);
 
-// Sistema de Logging
-const LOG={
-  info:(msg)=>console.log(`ℹ️ [WO] ${msg}`),
-  warn:(msg)=>console.warn(`⚠️ [WO] ${msg}`),
-  error:(msg)=>console.error(`❌ [WO] ${msg}`),
-  success:(msg)=>console.log(`✅ [WO] ${msg}`)
-};
-
-// Heartbeat: mantém o projeto Supabase ativo (evita pausa por inatividade)
-async function heartbeat(){try{await sb.from('aircrafts').select('id',{count:'exact',head:true});}catch(e){}}
-heartbeat();
-
 // Estado dos painéis abertos
 const openPanels = new Set();
 
@@ -221,9 +226,7 @@ async function load(){
       .select('*,tasks(*,findings(*),observations(*))')
       .order('code');
     if(error)throw error;
-    // Filtrar apenas aeronaves com tarefas (ignora aeronaves vazias)
-    const aeroComTarefas=(data||[]).filter(ac=>ac.tasks&&ac.tasks.length>0);
-    render(aeroComTarefas);
+    render(data||[]);
     setConn(true);
   }catch(e){
     setConn(false);
@@ -239,18 +242,9 @@ function render(data){
     stats(0,0,0,0,0,0,0,0);return;
   }
 
-  // ORDENAÇÃO NÍVEL 1: Aeronaves abertas primeiro, concluídas depois
-  const dataSorted = data.sort((a,b)=>{
-    const aDone = (a.tasks||[]).every(t=>t.completed||t.deferred);
-    const bDone = (b.tasks||[]).every(t=>t.completed||t.deferred);
-    if(aDone && !bDone) return 1;  // a concluída vai para baixo
-    if(!aDone && bDone) return -1; // b concluída vai para baixo
-    return a.code.localeCompare(b.code); // mesma categoria: ordem alfabética
-  });
+  let tAC=data.length,tWO=0,dWO=0,sWO=0,fAC=0,tWOunicas=0,tDef=0,tObs=0;
 
-  let tAC=dataSorted.length,tWO=0,dWO=0,sWO=0,fAC=0,tWOunicas=0,tDef=0,tObs=0;
-
-  const html=dataSorted.map(ac=>{
+  const html=data.map(ac=>{
     const tasks=ac.tasks||[];
     const done=tasks.filter(t=>t.completed).length;
     const deferred=tasks.filter(t=>t.deferred).length;
@@ -287,18 +281,7 @@ function render(data){
       woGrupos[task.wo_number].push(task);
     });
 
-    // ORDENAÇÃO NÍVEL 2: WOs abertas primeiro, concluídas depois
-    const woEntries = Object.entries(woGrupos).sort((a,b)=>{
-      const [,aTasks] = a;
-      const [,bTasks] = b;
-      const aDone = aTasks.every(t=>t.completed||t.deferred);
-      const bDone = bTasks.every(t=>t.completed||t.deferred);
-      if(aDone && !bDone) return 1;  // a concluída vai para baixo
-      if(!aDone && bDone) return -1; // b concluída vai para baixo
-      return a[0].localeCompare(b[0]); // mesma categoria: ordem alfabética do WO
-    });
-
-    const detailHtml=woEntries.map(([woNum, woTasks])=>{
+    const detailHtml=Object.entries(woGrupos).map(([woNum, woTasks])=>{
       // Status geral do grupo: concluído só se todas concluídas
       const todoConcluido=woTasks.every(t=>t.completed||t.deferred);
       const algumDeferido=woTasks.some(t=>t.deferred);
@@ -315,17 +298,8 @@ function render(data){
         :algumStarted?`<span class="badge b-started" style="font-size:9px;padding:2px 7px">▶ Andamento</span>`
         :`<span class="badge b-pending" style="font-size:9px;padding:2px 7px">Aguardando</span>`;
 
-      // ORDENAÇÃO NÍVEL 3: Tarefas abertas primeiro, concluídas depois
-      const woTasksSorted = woTasks.sort((a,b)=>{
-        const aDone = a.completed || a.deferred;
-        const bDone = b.completed || b.deferred;
-        if(aDone && !bDone) return 1;  // a concluída vai para baixo
-        if(!aDone && bDone) return -1; // b concluída vai para baixo
-        return 0; // mesma categoria: manter ordem original
-      });
-
       // Listar cada sub-tarefa com obs
-      const subTarefas=woTasksSorted.map(task=>{
+      const subTarefas=woTasks.map(task=>{
         const obs=(task.observations||[]).sort((a,b)=>(a.recorded_at||'').localeCompare(b.recorded_at||''));
         const finds=(task.findings||[]);
         const tDone=task.completed;
@@ -376,13 +350,21 @@ function render(data){
 
 
     const acObs=tasks.filter(t=>(t.observations||[]).length>0).length;
+    // Alerta: se nenhuma tarefa foi iniciada, código pisca
+    const nenhumaIniciada=tasks.length>0&&!tasks.some(t=>t.started);
+    
+    // ALERTA 5H: WO aberta (tarefas pendentes) após 5h da manhã
+    const hora = new Date().getHours();
+    const temPendente = tasks.some(t => !t.completed && !t.deferred);
+    const alertaCritico = hora >= 5 && temPendente;
 
     return `
     <tr class="ac-row ${hasFind?'finding':''}" onclick="toggleDetail('${ac.id}')">
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="arrow ${isOpen?'open':''}" id="arrow-${ac.id}">▶</span>
-          <span class="ac-code">${ac.code}</span>
+          <span class="ac-code ${alertaCritico?'urgent':nenhumaIniciada?'alert':''}">${ac.code}</span>
+          ${alertaCritico?`<span class="badge b-urgent">⚠️ URGENTE</span>`:''}
           ${acObs?`<span class="badge b-obs" style="font-size:9px;padding:2px 6px">💬 ${acObs}</span>`:''}
         </div>
       </td>
@@ -408,6 +390,25 @@ function render(data){
   tbody.innerHTML=html;
   verificarNovosFindings(data);
   stats(tAC,tWOunicas,tWO,dWO,sWO,fAC,tDef,tObs);
+  
+  // ALERTA 5H: contar aeronaves com WO aberta
+  const hora = new Date().getHours();
+  if (hora >= 5) {
+    const acPendentes = data.filter(ac => {
+      const tasks = ac.tasks || [];
+      return tasks.some(t => !t.completed && !t.deferred);
+    }).length;
+    
+    if (acPendentes > 0) {
+      document.getElementById('alert-5h').style.display = 'flex';
+      document.getElementById('alert-count').textContent = acPendentes;
+    } else {
+      document.getElementById('alert-5h').style.display = 'none';
+    }
+  } else {
+    document.getElementById('alert-5h').style.display = 'none';
+  }
+  
   document.getElementById('footer').textContent=`⏰ Atualizado em ${new Date().toLocaleTimeString('pt-BR')}`;
   ajustarEscala(data.length);
 }
@@ -568,109 +569,71 @@ function parsePDFPernoite(linhas){
   const map={};
   const reAC=/^P[RS]-[A-Z0-9]{2,4}$/;
   const PRIOS=['IMPRET','ALTA','ROTINA','NRC','MEL'];
-  let acAtual=null; // Contexto da última aeronave processada
-  let linhasIgnoradas=0;
 
-  linhas.forEach((linha,idx)=>{
+  linhas.forEach(linha=>{
     const tokens=linha.trim().split(/\s+/);
-    if(!tokens.length)return;
-    
-    // Se começa com código de aeronave
-    if(reAC.test(tokens[0])){
-      acAtual=tokens[0];
-      const resto=tokens.slice(1);
-      const restoStr=resto.join(' ');
+    if(!tokens.length||!reAC.test(tokens[0]))return;
+    const ac=tokens[0];
+    const resto=tokens.slice(1);
+    const restoStr=resto.join(' ');
 
-      // Linha cabeçalho — contém "PRIORIDADE T H" e "COD"
-      if(restoStr.includes('PRIORIDADE')&&restoStr.includes('COD')){
-        const pIdx=restoStr.indexOf('PRIORIDADE');
-        let tecnico=restoStr.slice(0,pIdx).trim();
-        
-        // Procurar por "BOX" para extrair apenas os nomes dos técnicos
-        const boxIdx=tecnico.toUpperCase().indexOf('BOX');
-        if(boxIdx>=0){
-          tecnico=tecnico.slice(boxIdx+3).trim(); // Remove "BOX" e tudo antes
-        } else {
-          // Remove datas, pipes e outros caracteres indesejados do início
-          tecnico=tecnico.replace(/^[\d\/\s\|:-]+/,'').trim();
-        }
-        
-        // Remove "box" do início se ainda existir (case insensitive)
-        tecnico=tecnico.replace(/^box\s*/i,'').trim()||'—';
-        
-        if(!map[acAtual])map[acAtual]={code:acAtual,technician:tecnico,tasks:[]};
-        else map[acAtual].technician=tecnico;
-        return;
-      }
-
-      // Linha de tarefa — segundo token deve ser WO (5-7 dígitos)
-      const wo=resto[0];
-      if(!/^\d{5,7}$/.test(wo))return;
-
-      // Processar tarefa
-      processarTarefa(map,acAtual,resto);
+    // Linha cabeçalho — contém "PRIORIDADE T H" e "COD"
+    if(restoStr.includes('PRIORIDADE')&&restoStr.includes('COD')){
+      const pIdx=restoStr.indexOf('PRIORIDADE');
+      const tecnico=restoStr.slice(0,pIdx).trim()||'—';
+      if(!map[ac])map[ac]={code:ac,technician:tecnico,tasks:[]};
+      else map[ac].technician=tecnico;
+      return;
     }
-    // Se não começa com aeronave MAS começa com WO number (tarefa sem prefixo)
-    else if(acAtual && /^\d{5,7}$/.test(tokens[0])){
-      // Tarefa órfã - atribuir à última aeronave conhecida
-      processarTarefa(map,acAtual,tokens);
-    }
-    else {
-      linhasIgnoradas++;
-    }
-  });
 
-  // Logging de diagnóstico
-  console.log(`📊 PDF processado: ${Object.keys(map).length} aeronaves, ${linhasIgnoradas} linhas ignoradas`);
-  return Object.values(map);
+    // Linha de tarefa — segundo token deve ser WO (5-7 dígitos)
+    const wo=resto[0];
+    if(!/^\d{5,7}$/.test(wo))return;
 
-  // Função auxiliar para processar tarefa
-  function processarTarefa(map,ac,tokens){
-    const wo=tokens[0];
-    
     // Extrair task_code: token(s) logo após WO antes da descrição
+    // Prefixo curto puro (MEL, GMM, HM) → task_code = prefixo + próximo token
+    // Caso contrário → primeiro token é o task_code
     let taskCode='',descStart=1;
-    const t1=tokens[1]||'',t2=tokens[2]||'';
+    const t1=resto[1]||'',t2=resto[2]||'';
     if(/^[A-Z]{2,4}$/.test(t1)&&!/\d/.test(t1)&&!PRIOS.includes(t1)){
       taskCode=t2?`${t1} ${t2}`:t1; descStart=3;
     } else if(t1){ taskCode=t1; descStart=2; }
 
     // Encontrar prioridade para separar descrição dos números finais
     let prioIdx=-1,prio='';
-    for(let i=descStart;i<tokens.length;i++){
-      if(PRIOS.includes(tokens[i])){prioIdx=i;prio=tokens[i];break;}
+    for(let i=descStart;i<resto.length;i++){
+      if(PRIOS.includes(resto[i])){prioIdx=i;prio=resto[i];break;}
     }
 
     let desc;
     if(prioIdx>descStart){
-      desc=tokens.slice(descStart,prioIdx).join(' ');
+      desc=resto.slice(descStart,prioIdx).join(' ');
     } else {
-      const numIdx=tokens.findIndex((t,i)=>i>=descStart&&/^\d+([,.]?\d*)$/.test(t));
-      desc=numIdx>=descStart?tokens.slice(descStart,numIdx).join(' '):tokens.slice(descStart).join(' ');
+      const numIdx=resto.findIndex((t,i)=>i>=descStart&&/^\d+([,.]?\d*)$/.test(t));
+      desc=numIdx>=descStart?resto.slice(descStart,numIdx).join(' '):resto.slice(descStart).join(' ');
     }
 
     if(!map[ac])map[ac]={code:ac,technician:'—',tasks:[]};
     map[ac].tasks.push({wo_number:wo,task_code:taskCode,description:desc.trim(),priority:prio});
-  }
+  });
+
+  return Object.values(map);
 }
 
 // ─── IMPORTAR EXCEL OU PDF ──────────────────────────────────
 async function importar(ev){
   const file=ev.target.files[0];if(!file)return;
   const isPDF=file.name.toLowerCase().endsWith('.pdf');
-  LOG.info(`Iniciando importação de ${isPDF?'PDF':'Excel'}: ${file.name}`);
   document.getElementById('tbody').innerHTML=`<tr><td colspan="7"><div class="loading"><div class="spinner"></div><p>Importando ${isPDF?'PDF':'planilha'}...</p></div></td></tr>`;
   try{
     let acMap={};
     if(isPDF){
       const linhas=await extrairLinhasPDF(file);
-      LOG.info(`PDF extraído: ${linhas.length} linhas`);
       parsePDFPernoite(linhas).forEach(ac=>{acMap[ac.code]=ac;});
     } else {
       const buf=await file.arrayBuffer();
       const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
       const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
-      LOG.info(`Excel lido: ${rows.length} linhas`);
       const reAC=/^[A-Z]{2}-[A-Z0-9]{2,4}$/;
       let tecnicoAtual='Não atribuído';
       rows.forEach(row=>{
@@ -681,10 +644,7 @@ async function importar(ev){
         if(!reAC.test(col0))return;
         const isHeader=col3.toUpperCase()==='PRIORIDADE'||col1.toUpperCase().includes('BOX')||col1.includes('|');
         if(isHeader){
-          if(col2&&col2.toUpperCase()!=='PRIORIDADE'){
-            // Remover "box" do início do nome (case insensitive)
-            tecnicoAtual=col2.replace(/^box\s*/i,'').trim()||'Não atribuído';
-          }
+          if(col2&&col2.toUpperCase()!=='PRIORIDADE')tecnicoAtual=col2;
           if(!acMap[col0])acMap[col0]={code:col0,technician:tecnicoAtual,tasks:[]};
           else acMap[col0].technician=tecnicoAtual;
           return;
@@ -696,22 +656,6 @@ async function importar(ev){
         acMap[col0].tasks.push({wo_number:wo,description:descCompleta});
       });
     }
-    
-    // Validação antes de salvar
-    const totalAero=Object.keys(acMap).length;
-    const totalTarefas=Object.values(acMap).reduce((s,a)=>s+a.tasks.length,0);
-    const aeroVazias=Object.values(acMap).filter(a=>!a.tasks.length);
-    
-    if(!totalAero){
-      throw new Error('Nenhuma aeronave encontrada no arquivo!');
-    }
-    
-    if(aeroVazias.length){
-      LOG.warn(`${aeroVazias.length} aeronaves sem tarefas: ${aeroVazias.map(a=>a.code).join(', ')}`);
-    }
-    
-    LOG.info(`Salvando no banco: ${totalAero} aeronaves, ${totalTarefas} tarefas`);
-    
     await sb.from('tasks').delete().neq('id','00000000-0000-0000-0000-000000000000');
     await sb.from('aircrafts').delete().neq('id','00000000-0000-0000-0000-000000000000');
     for(const ac of Object.values(acMap)){
@@ -720,26 +664,9 @@ async function importar(ev){
         await sb.from('tasks').insert(ac.tasks.map(t=>({aircraft_id:ins[0].id,wo_number:t.wo_number,task_code:t.task_code||null,description:t.description})));
     }
     await load();
-    
-    // Relatório detalhado
-    let relatorio=`✅ Importação Concluída!\n\n📊 RESUMO:\n`;
-    relatorio+=`✈️ ${totalAero} aeronaves\n`;
-    relatorio+=`📋 ${totalTarefas} tarefas\n`;
-    relatorio+=`📈 Média: ${(totalTarefas/totalAero).toFixed(1)} tarefas/aeronave\n`;
-    
-    if(aeroVazias.length){
-      relatorio+=`\n⚠️ AVISOS:\n`;
-      relatorio+=`${aeroVazias.length} aeronaves sem tarefas (não exibidas no painel)\n`;
-    }
-    
-    LOG.success('Importação concluída!');
-    alert(relatorio);
-  }catch(err){
-    LOG.error(`Falha na importação: ${err.message}`);
-    console.error(err);
-    alert('❌ Erro na importação:\n'+err.message);
-    await load();
-  }
+    const tot=Object.values(acMap).reduce((s,a)=>s+a.tasks.length,0);
+    alert(`✅ Importado!\n${Object.keys(acMap).length} aeronaves · ${tot} tarefas`);
+  }catch(err){console.error(err);alert('❌ Erro: '+err.message);await load();}
   ev.target.value='';
 }
 
@@ -953,41 +880,23 @@ function verificarNovosFindings(data){
 
 // ═══════════════════════════════════════
 // Realtime — mantém painéis abertos ao atualizar
-let realtimeOk = false; // Declarado ANTES de usar
-
 sb.channel('painel-rt')
-  .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>{LOG.info('Realtime: tasks atualizado');load();})
-  .on('postgres_changes',{event:'*',schema:'public',table:'aircrafts'},()=>{LOG.info('Realtime: aircrafts atualizado');load();})
-  .on('postgres_changes',{event:'*',schema:'public',table:'findings'},()=>{LOG.info('Realtime: findings atualizado');load();})
-  .on('postgres_changes',{event:'*',schema:'public',table:'observations'},()=>{LOG.info('Realtime: observations atualizado');load();})
+  .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},load)
+  .on('postgres_changes',{event:'*',schema:'public',table:'aircrafts'},load)
+  .on('postgres_changes',{event:'*',schema:'public',table:'findings'},load)
+  .on('postgres_changes',{event:'*',schema:'public',table:'observations'},load)
   .subscribe(s=>{
-    if(s==='SUBSCRIBED'){
-      LOG.success('Realtime conectado');
-      realtimeOk=true;
-    }else if(s==='CHANNEL_ERROR'){
-      LOG.error('Realtime: erro de conexão');
-      realtimeOk=false;
-    }else if(s==='TIMED_OUT'){
-      LOG.warn('Realtime: timeout');
-      realtimeOk=false;
-    }
-    setConn(realtimeOk);
+    setConn(s==='SUBSCRIBED');
+    realtimeOk = (s==='SUBSCRIBED');
   });
 
 // Polling inteligente: só ativa se realtime estiver offline
-setInterval(()=>{ 
-  if(!realtimeOk){
-    LOG.warn('Realtime offline - usando polling');
-    load();
-  }
-}, 15000);
+let realtimeOk = false;
+setInterval(()=>{ if(!realtimeOk) load(); }, 15000);
 
 // Recarregar ao voltar para a aba
 document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState==='visible'){
-    LOG.info('Aba visível novamente - recarregando');
-    load();
-  }
+  if(document.visibilityState==='visible') load();
 });
 
 load();
