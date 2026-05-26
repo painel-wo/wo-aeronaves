@@ -179,7 +179,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
   <div class="alert-banner" id="alert-5h" style="display:none">
     <span class="alert-banner-text">⏰ ALERTA 5H DA MANHÃ —</span>
     <span class="alert-banner-count" id="alert-count">0</span>
-    <span class="alert-banner-text">AERONAVE(S) COM WO ABERTA</span>
+    <span class="alert-banner-text">WO EM ABERTO</span>
   </div>
 
   <div class="summary">
@@ -218,7 +218,90 @@ const sb=window.supabase.createClient(URL_,KEY);
 // Estado dos painéis abertos
 const openPanels = new Set();
 
+// Controle de turno ativo
+let turnoAtivoId = null;
+let turnoInicio = null;
+
 function agora(){return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+
+// ─── GERENCIAMENTO DE TURNO ────────────────────────────────
+async function inicializarTurno() {
+  try {
+    // Busca turno ativo (hoje, sem encerrado_em)
+    const { data, error } = await sb
+      .from('turnos')
+      .select('*')
+      .eq('data_turno', new Date().toISOString().split('T')[0])
+      .is('encerrado_em', null)
+      .maybeSingle();
+    
+    if (error) throw error;
+    
+    if (data) {
+      turnoAtivoId = data.id;
+      turnoInicio = data.inicio;
+    }
+  } catch (e) {
+    console.error('Erro ao inicializar turno:', e);
+  }
+}
+
+async function criarTurno() {
+  try {
+    const { data, error } = await sb
+      .from('turnos')
+      .insert([{
+        data_turno: new Date().toISOString().split('T')[0],
+        inicio: null
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    turnoAtivoId = data.id;
+    turnoInicio = null;
+    console.log('✅ Turno criado:', data.id);
+  } catch (e) {
+    console.error('Erro ao criar turno:', e);
+  }
+}
+
+async function verificarInicioAutomatico() {
+  if (!turnoAtivoId || turnoInicio) return; // Já iniciado ou sem turno
+  
+  const agora = new Date();
+  const hora = agora.getHours();
+  const minuto = agora.getMinutes();
+  
+  // Se é meia-noite (00:00 a 00:05), marcar início
+  if (hora === 0 && minuto < 5) {
+    try {
+      const { error } = await sb
+        .from('turnos')
+        .update({ inicio: new Date().toISOString() })
+        .eq('id', turnoAtivoId);
+      
+      if (error) throw error;
+      
+      turnoInicio = new Date().toISOString();
+      console.log('✅ Turno iniciado automaticamente às 00:00');
+    } catch (e) {
+      console.error('Erro ao marcar início do turno:', e);
+    }
+  }
+}
+
+function calcularHorasDesdeInicio() {
+  if (!turnoInicio) return 0;
+  
+  const inicio = new Date(turnoInicio);
+  const agora = new Date();
+  const diffMs = agora - inicio;
+  const diffHoras = diffMs / 1000 / 60 / 60;
+  
+  return diffHoras;
+}
 
 async function load(){
   try{
@@ -353,10 +436,10 @@ function render(data){
     // Alerta: se nenhuma tarefa foi iniciada, código pisca
     const nenhumaIniciada=tasks.length>0&&!tasks.some(t=>t.started);
     
-    // ALERTA 5H: WO aberta (tarefas pendentes) após 5h da manhã
-    const hora = new Date().getHours();
+    // ALERTA 5H: WO aberta (tarefas pendentes) após 5h do início do turno
+    const horasDesdeInicio = calcularHorasDesdeInicio();
     const temPendente = tasks.some(t => !t.completed && !t.deferred);
-    const alertaCritico = hora >= 5 && temPendente;
+    const alertaCritico = horasDesdeInicio >= 5 && temPendente;
 
     return `
     <tr class="ac-row ${hasFind?'finding':''}" onclick="toggleDetail('${ac.id}')">
@@ -391,17 +474,25 @@ function render(data){
   verificarNovosFindings(data);
   stats(tAC,tWOunicas,tWO,dWO,sWO,fAC,tDef,tObs);
   
-  // ALERTA 5H: contar aeronaves com WO aberta
-  const hora = new Date().getHours();
-  if (hora >= 5) {
-    const acPendentes = data.filter(ac => {
+  // ALERTA 5H: contar WOs únicas em aberto após 5h do início do turno
+  const horasDesdeInicio = calcularHorasDesdeInicio();
+  if (horasDesdeInicio >= 5) {
+    // Coletar todas as WOs com tarefas pendentes
+    const wosAbertas = new Set();
+    data.forEach(ac => {
       const tasks = ac.tasks || [];
-      return tasks.some(t => !t.completed && !t.deferred);
-    }).length;
+      tasks.forEach(t => {
+        if (!t.completed && !t.deferred) {
+          wosAbertas.add(t.wo_number);
+        }
+      });
+    });
     
-    if (acPendentes > 0) {
+    const totalWosAbertas = wosAbertas.size;
+    
+    if (totalWosAbertas > 0) {
       document.getElementById('alert-5h').style.display = 'flex';
-      document.getElementById('alert-count').textContent = acPendentes;
+      document.getElementById('alert-count').textContent = totalWosAbertas;
     } else {
       document.getElementById('alert-5h').style.display = 'none';
     }
@@ -664,6 +755,10 @@ async function importar(ev){
         await sb.from('tasks').insert(ac.tasks.map(t=>({aircraft_id:ins[0].id,wo_number:t.wo_number,task_code:t.task_code||null,description:t.description})));
     }
     await load();
+    // Criar turno ativo se não existir
+    if (!turnoAtivoId) {
+      await criarTurno();
+    }
     const tot=Object.values(acMap).reduce((s,a)=>s+a.tasks.length,0);
     alert(`✅ Importado!\n${Object.keys(acMap).length} aeronaves · ${tot} tarefas`);
   }catch(err){console.error(err);alert('❌ Erro: '+err.message);await load();}
@@ -894,12 +989,19 @@ sb.channel('painel-rt')
 let realtimeOk = false;
 setInterval(()=>{ if(!realtimeOk) load(); }, 15000);
 
+// Verificar início automático às 00h a cada minuto
+setInterval(verificarInicioAutomatico, 60000);
+
 // Recarregar ao voltar para a aba
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState==='visible') load();
 });
 
-load();
+// Inicialização
+(async () => {
+  await inicializarTurno();
+  await load();
+})();
 </script>
 
 </body>
