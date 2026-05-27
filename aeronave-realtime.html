@@ -205,6 +205,17 @@ function agora() {
   return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 }
 
+// ─── VALIDAÇÃO ROBUSTA DE AERONAVE ─────────────────────────
+function aeronaveValida(ac){
+  if(!ac||!ac.tasks||!ac.tasks.length) return false;
+  return ac.tasks.some(t=>
+    t.wo_number &&
+    String(t.wo_number).trim() !== '' &&
+    String(t.wo_number).trim() !== '0' &&
+    /\d/.test(String(t.wo_number))
+  );
+}
+
 // ─── TELA SELEÇÃO ──────────────────────────────────────────
 async function carregarAeronaves() {
   const list = document.getElementById('ac-list');
@@ -213,14 +224,14 @@ async function carregarAeronaves() {
     const {data,error} = await sb.from('aircrafts')
       .select('*, tasks(*, observations(*))').order('code');
     if (error) throw error;
-    // Filtrar apenas aeronaves com tarefas (ignora aeronaves vazias)
-    const aeroComTarefas = (data||[]).filter(ac=>ac.tasks&&ac.tasks.length>0);
-    if (!aeroComTarefas.length) {
+    // Filtro robusto: apenas aeronaves com WO válida
+    const validas = (data||[]).filter(aeronaveValida);
+    if (!validas.length) {
       list.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:2rem">Nenhuma aeronave com programação.<br>Importe um Excel no painel.</p>';
       return;
     }
     list.innerHTML = '';
-    aeroComTarefas.forEach(ac => {
+    validas.forEach(ac => {
       const tasks   = ac.tasks || [];
       const done    = tasks.filter(t=>t.completed).length;
       const deferred= tasks.filter(t=>t.deferred).length;
