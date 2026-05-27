@@ -433,8 +433,8 @@ function render(data){
 
 
     const acObs=tasks.filter(t=>(t.observations||[]).length>0).length;
-    // Alerta: se nenhuma tarefa foi iniciada, código pisca
-    const nenhumaIniciada=tasks.length>0&&!tasks.some(t=>t.started);
+    // Alerta: se nenhuma tarefa foi iniciada (só após turno iniciar às 00h)
+    const nenhumaIniciada=turnoInicio&&tasks.length>0&&!tasks.some(t=>t.started);
     
     // ALERTA 5H: WO aberta (tarefas pendentes) após 5h do início do turno
     const horasDesdeInicio = calcularHorasDesdeInicio();
