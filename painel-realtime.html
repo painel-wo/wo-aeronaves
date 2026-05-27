@@ -732,6 +732,11 @@ async function importar(ev){
       if(ins?.[0]&&ac.tasks.length)
         await sb.from('tasks').insert(ac.tasks.map(t=>({aircraft_id:ins[0].id,wo_number:t.wo_number,task_code:t.task_code||null,description:t.description})));
     }
+
+    // Limpeza final no banco — remove qualquer aeronave que escapou sem WO
+    await sb.rpc('fn_limpar_aeronaves_sem_wo');
+    LOG.info('Limpeza pós-importação executada no banco');
+
     await load();
     
     // Relatório detalhado
