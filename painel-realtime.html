@@ -433,9 +433,6 @@ function render(data){
 
 
     const acObs=tasks.filter(t=>(t.observations||[]).length>0).length;
-    // Alerta: se nenhuma tarefa foi iniciada (só após turno iniciar às 00h)
-    const nenhumaIniciada=turnoInicio&&tasks.length>0&&!tasks.some(t=>t.started);
-    
     // ALERTA 5H: WO aberta (tarefas pendentes) após 5h do início do turno
     const horasDesdeInicio = calcularHorasDesdeInicio();
     const temPendente = tasks.some(t => !t.completed && !t.deferred);
@@ -446,7 +443,7 @@ function render(data){
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="arrow ${isOpen?'open':''}" id="arrow-${ac.id}">▶</span>
-          <span class="ac-code ${alertaCritico?'urgent':nenhumaIniciada?'alert':''}">${ac.code}</span>
+          <span class="ac-code ${alertaCritico?'urgent':''}">${ac.code}</span>
           ${alertaCritico?`<span class="badge b-urgent">⚠️ URGENTE</span>`:''}
           ${acObs?`<span class="badge b-obs" style="font-size:9px;padding:2px 6px">💬 ${acObs}</span>`:''}
         </div>
