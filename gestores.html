@@ -220,6 +220,40 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
     </div>
   </div>
 
+
+  <!-- S5: PESSOAS, MTL E AERONAVES CRÍTICAS -->
+  <div class="secao">
+    <div class="secao-header">
+      <div class="secao-titulo">Pessoas, Material e Atenção</div>
+      <div class="secao-linha"></div>
+    </div>
+    <div class="grid-3">
+
+      <!-- RANKING DE TÉCNICOS -->
+      <div class="card-g">
+        <div class="card-g-titulo">🏆 Ranking Individual de Técnicos <span class="tag ta">WOs concluídas</span></div>
+        <div class="card-g-sub">Extraído das equipes registradas no histórico</div>
+        <div id="rank-tec"></div>
+      </div>
+
+      <!-- AERONAVES PROBLEMÁTICAS -->
+      <div class="card-g">
+        <div class="card-g-titulo">⚠️ Aeronaves com Pendências Recorrentes</div>
+        <div class="card-g-sub">Ordenadas por WOs pendentes acumuladas + deferimentos</div>
+        <div id="aero-prob"></div>
+      </div>
+
+      <!-- TAXA MTL -->
+      <div class="card-g">
+        <div class="card-g-titulo">📦 Aeronaves com Material Crítico (MTL)</div>
+        <div class="card-g-sub" id="mtl-sub">Aeronaves que exigiram material crítico no histórico</div>
+        <div id="mtl-lista"></div>
+        <div class="cw h120" style="margin-top:12px"><canvas id="chart-mtl"></canvas></div>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -503,6 +537,163 @@ function render(turnos, aeros, defs){
      <div class="rval" style="color:#a5b4fc">${d.n}x</div></div>`).join('');
 
   LOG.info('Dashboard renderizado');
+  carregarMetricas(aeros, defs);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// MÉTRICAS: TÉCNICOS, AERONAVES CRÍTICAS, MTL
+// ═══════════════════════════════════════════════════════════
+async function carregarMetricas(aeros, defs){
+  try{
+    // ── RANKING INDIVIDUAL DE TÉCNICOS
+    // Divide os nomes das equipes e conta individualmente
+    const contTec={};
+    const concTec={};
+    aeros.filter(a=>a.wo_total>0&&a.tecnico&&a.tecnico.trim()&&!['—','Não atribuído','SEM PROGRAMAÇÃO'].includes(a.tecnico.trim()))
+      .forEach(a=>{
+        const nomes=a.tecnico
+          .replace(/\d{2}\/\d{2}[^|]*\|[^|]*\|\s*/g,'') // remove datas
+          .split(/\s*[-\/,]\s*/)
+          .map(n=>n.trim())
+          .filter(n=>n.length>2&&!/^\d/.test(n));
+        nomes.forEach(nome=>{
+          contTec[nome]=(contTec[nome]||0)+(a.wo_total||0);
+          concTec[nome]=(concTec[nome]||0)+(a.wo_concluidas||0);
+        });
+      });
+    const rankTec=Object.entries(concTec)
+      .map(([n,c])=>({n,c,t:contTec[n]||c,pct:contTec[n]>0?Math.round(c/contTec[n]*100):100}))
+      .sort((a,b)=>b.c-a.c).slice(0,10);
+    const maxC=rankTec[0]?.c||1;
+    const PC2=['rp1','rp2','rp3','rpn','rpn','rpn','rpn','rpn','rpn','rpn'];
+    document.getElementById('rank-tec').innerHTML=rankTec.length
+      ?rankTec.map((r,i)=>`
+        <div class="rank-item">
+          <div class="rpos ${PC2[i]}">${i+1}</div>
+          <div class="rcod" style="min-width:90px;font-size:11px">${r.n}</div>
+          <div class="rbar-w"><div class="rbar" style="width:${r.c/maxC*100}%;background:#3b82f6"></div></div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:42px">
+            <span class="rval" style="color:#60a5fa">${r.c} WO</span>
+            <span style="font-size:9px;color:#475569">${r.pct}%</span>
+          </div>
+        </div>`).join('')
+      :'<div style="color:#475569;font-size:12px;text-align:center;padding:20px 0">Sem dados de técnicos</div>';
+
+    // ── AERONAVES PROBLEMÁTICAS
+    const mapaProb={};
+    aeros.filter(a=>a.wo_total>0).forEach(a=>{
+      if(!mapaProb[a.codigo])mapaProb[a.codigo]={cod:a.codigo,pend:0,n:0,pctArr:[],def:0};
+      mapaProb[a.codigo].pend+=(a.wo_pendentes||0);
+      mapaProb[a.codigo].n++;
+      mapaProb[a.codigo].pctArr.push(a.pct_conclusao||0);
+    });
+    defs.forEach(d=>{
+      // Buscar a qual aeronave pertence o deferimento via turno_aeronave_id
+      // Já temos nos dados — marcamos via codigo no aeros
+    });
+    // Adicionar deferimentos via aeroMap
+    const defPorAero={};
+    aeros.forEach(a=>{
+      if(!defPorAero[a.codigo])defPorAero[a.codigo]=0;
+    });
+    defs.forEach(d=>{
+      const aero=aeros.find(a=>a.id===d.turno_aeronave_id);
+      if(aero)defPorAero[aero.codigo]=(defPorAero[aero.codigo]||0)+1;
+    });
+
+    const rankProb=Object.values(mapaProb)
+      .map(a=>({
+        ...a,
+        mediaP:a.pctArr.reduce((s,v)=>s+v,0)/a.pctArr.length,
+        score:(a.pend*3)+(defPorAero[a.cod]||0)*5+(100-a.pctArr.reduce((s,v)=>s+v,0)/a.pctArr.length)*0.5
+      }))
+      .sort((a,b)=>b.score-a.score).slice(0,8);
+
+    document.getElementById('aero-prob').innerHTML=rankProb.length
+      ?rankProb.map((r,i)=>{
+        const cor=r.mediaP>=85?'#10b981':r.mediaP>=70?'#fbbf24':'#f87171';
+        const def=defPorAero[r.cod]||0;
+        return `<div class="rank-item">
+          <div class="rpos ${PC2[i]}">${i+1}</div>
+          <div class="rcod">${r.cod}</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+            <div style="font-size:10px;color:#475569">
+              ${r.pend>0?`<span style="color:#f87171">⏳ ${r.pend} WO pend.</span> · `:''}
+              ${def>0?`<span style="color:#fbbf24">⏸ ${def} deferred</span> · `:''}
+              <span>${r.n} turnos</span>
+            </div>
+          </div>
+          <div class="rval" style="color:${cor}">${Math.round(r.mediaP)}%</div>
+        </div>`;
+      }).join('')
+      :'<div style="color:#64748b;font-size:12px;text-align:center;padding:20px 0">✅ Nenhuma aeronave problemática</div>';
+
+    // ── MTL: buscar do banco
+    const turnoIds=[...new Set(aeros.map(a=>a.turno_id))];
+    const{data:aerosMTL}=await sb.from('turno_aeronaves')
+      .select('codigo,mtl_critico,wo_total,wo_concluidas,pct_conclusao')
+      .in('turno_id',turnoIds)
+      .not('mtl_critico','is',null)
+      .gt('wo_total',0);
+
+    const mtlMap={};
+    (aerosMTL||[]).forEach(a=>{
+      const m=a.mtl_critico||'';
+      if(!m||['OK','NHE','','null'].includes(m))return;
+      if(!mtlMap[a.codigo])mtlMap[a.codigo]={cod:a.codigo,tipos:new Set(),n:0,pcts:[]};
+      mtlMap[a.codigo].tipos.add(m);
+      mtlMap[a.codigo].n++;
+      mtlMap[a.codigo].pcts.push(a.pct_conclusao||0);
+    });
+
+    const mtlLista=Object.values(mtlMap)
+      .map(a=>({...a,media:a.pcts.reduce((s,v)=>s+v,0)/a.pcts.length,tipos:[...a.tipos]}))
+      .sort((a,b)=>b.n-a.n);
+
+    document.getElementById('mtl-sub').textContent=
+      mtlLista.length>0
+        ?`${mtlLista.length} aeronave${mtlLista.length>1?'s':''} com ocorrências de material crítico`
+        :'Nenhuma ocorrência de material crítico';
+
+    const CM2=['#f87171','#fbbf24','#fb923c','#a78bfa','#60a5fa','#34d399','#10b981','#e879f9'];
+    document.getElementById('mtl-lista').innerHTML=mtlLista.slice(0,5).map((a,i)=>`
+      <div class="mot-row">
+        <div class="mot-cor" style="background:${CM2[i]}"></div>
+        <div class="mot-nome">${a.cod}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
+          <span class="mot-n">${a.n}x</span>
+          <span style="font-size:9px;color:#475569">${a.tipos.join(', ')}</span>
+        </div>
+      </div>`).join('');
+
+    if(mtlLista.length){
+      dc('mtl');
+      charts.mtl=new Chart(document.getElementById('chart-mtl'),{
+        type:'bar',
+        data:{
+          labels:mtlLista.slice(0,8).map(a=>a.cod),
+          datasets:[{
+            label:'Ocorrências MTL',
+            data:mtlLista.slice(0,8).map(a=>a.n),
+            backgroundColor:mtlLista.slice(0,8).map((_,i)=>CM2[i]),
+            borderRadius:4
+          }]
+        },
+        options:{
+          responsive:true,maintainAspectRatio:false,indexAxis:'y',
+          plugins:{legend:{display:false},tooltip:{backgroundColor:'#0f172a',borderColor:'#334155',borderWidth:1,titleColor:'#f8fafc',bodyColor:'#94a3b8'}},
+          scales:{
+            x:{grid:{color:'rgba(30,41,59,.8)'},ticks:{color:'#475569',font:{size:9}}},
+            y:{grid:{display:false},ticks:{color:'#e2e8f0',font:{size:10}}}
+          }
+        }
+      });
+    }
+
+  }catch(e){
+    LOG.error('Métricas S5: '+e.message);
+  }
 }
 
 // Realtime
