@@ -609,16 +609,17 @@ async function extrairLinhasPDF(file){
   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const buf=await file.arrayBuffer();
   const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  LOG.info(`PDF aberto: ${pdf.numPages} página(s)`);
   const linhas=[];
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p);
     const tc=await page.getTextContent();
     const items=tc.items.map(i=>({t:i.str.trim(),x:Math.round(i.transform[4]),y:Math.round(i.transform[5])})).filter(i=>i.t);
-    // Agrupar por Y (linhas com ±3px)
+    // Agrupar por Y — tolerância ±5px (mais robusto para PDFs antigos)
     const grupos=[];
     items.sort((a,b)=>b.y-a.y||a.x-b.x);
     items.forEach(item=>{
-      const g=grupos.find(g=>Math.abs(g.y-item.y)<=3);
+      const g=grupos.find(g=>Math.abs(g.y-item.y)<=5);
       if(g){g.items.push(item);}
       else grupos.push({y:item.y,items:[item]});
     });
@@ -627,14 +628,18 @@ async function extrairLinhasPDF(file){
       if(txt)linhas.push(txt);
     });
   }
+  LOG.info(`Linhas extraídas do PDF: ${linhas.length}`);
   return linhas;
 }
 
 function parsePDFPernoite(linhas){
   const map={};
-  const reAC=/^P[RS]-[A-Z0-9]{2,4}$/;
-  const PRIOS=['IMPRET','ALTA','ROTINA','NRC','MEL'];
-  let acAtual=null; // Contexto da última aeronave processada
+  // Aceita: PR-, PS-, PP-, PT-, PU-, PV- (todos os prefixos brasileiros)
+  const reAC=/^P[A-Z]-[A-Z0-9]{2,4}$/;
+  // WO: 4-8 dígitos (mais tolerante para PDFs antigos)
+  const reWO=/^\d{4,8}$/;
+  const PRIOS=['IMPRET','ALTA','ROTINA','NRC','MEL','NORMAL'];
+  let acAtual=null;
   let linhasIgnoradas=0;
 
   linhas.forEach((linha,idx)=>{
@@ -647,37 +652,44 @@ function parsePDFPernoite(linhas){
       const resto=tokens.slice(1);
       const restoStr=resto.join(' ');
 
-      // Linha cabeçalho — contém "PRIORIDADE T H" e "COD"
-      if(restoStr.includes('PRIORIDADE')&&restoStr.includes('COD')){
-        const pIdx=restoStr.indexOf('PRIORIDADE');
-        let tecnico=restoStr.slice(0,pIdx).trim();
+      // Linha cabeçalho — contém "PRIORIDADE" OU "BOX" OU pipe (|)
+      const isHeader = restoStr.includes('PRIORIDADE') ||
+                       restoStr.toUpperCase().includes('BOX') ||
+                       restoStr.includes('|') ||
+                       restoStr.includes('COD');
+
+      if(isHeader){
+        let tecnico = restoStr;
         
-        // Procurar por "BOX" para extrair apenas os nomes dos técnicos
-        const boxIdx=tecnico.toUpperCase().indexOf('BOX');
-        if(boxIdx>=0){
-          tecnico=tecnico.slice(boxIdx+3).trim(); // Remove "BOX" e tudo antes
+        // Extrair técnico: tudo entre BOX e PRIORIDADE
+        const boxIdx = tecnico.toUpperCase().indexOf('BOX');
+        const prioIdx = tecnico.indexOf('PRIORIDADE');
+        
+        if(boxIdx>=0 && prioIdx>boxIdx){
+          tecnico = tecnico.slice(boxIdx+3, prioIdx).trim();
+        } else if(boxIdx>=0){
+          tecnico = tecnico.slice(boxIdx+3).trim();
+        } else if(prioIdx>=0){
+          tecnico = tecnico.slice(0, prioIdx).replace(/^[\d\/\s\|:-]+/,'').trim();
         } else {
-          // Remove datas, pipes e outros caracteres indesejados do início
-          tecnico=tecnico.replace(/^[\d\/\s\|:-]+/,'').trim();
+          tecnico = tecnico.replace(/^[\d\/\s\|:-]+/,'').trim();
         }
         
-        // Remove "box" do início se ainda existir (case insensitive)
-        tecnico=tecnico.replace(/^box\s*/i,'').trim()||'—';
+        tecnico = tecnico.replace(/^box\s*/i,'').trim() || '—';
         
         if(!map[acAtual])map[acAtual]={code:acAtual,technician:tecnico,tasks:[]};
         else map[acAtual].technician=tecnico;
         return;
       }
 
-      // Linha de tarefa — segundo token deve ser WO (5-7 dígitos)
+      // Linha de tarefa — segundo token deve ser WO
       const wo=resto[0];
-      if(!/^\d{5,7}$/.test(wo))return;
+      if(!reWO.test(wo))return;
 
-      // Processar tarefa
       processarTarefa(map,acAtual,resto);
     }
-    // Se não começa com aeronave MAS começa com WO number (tarefa sem prefixo)
-    else if(acAtual && /^\d{5,7}$/.test(tokens[0])){
+    // Tarefa sem prefixo de aeronave — atribui à última aeronave
+    else if(acAtual && reWO.test(tokens[0])){
       // Tarefa órfã - atribuir à última aeronave conhecida
       processarTarefa(map,acAtual,tokens);
     }
