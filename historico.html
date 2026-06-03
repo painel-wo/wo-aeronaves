@@ -206,15 +206,46 @@ const openAeros=new Set();
 
 async function load(){
   const grid=document.getElementById('turnos-grid');
+  grid.innerHTML='<div class="empty">⏳ Carregando histórico...</div>';
   try{
-    const{data,error}=await sb.from('turnos')
-      .select('*,turno_aeronaves(*,turno_tarefas!turno_aeronave_id(*))')
-      .order('criado_em',{ascending:false});
-    if(error)throw error;
-    if(!data||!data.length){
+    // Carregar turnos básicos primeiro (sem join pesado)
+    const{data:turnos,error:e1}=await sb.from('turnos')
+      .select('*')
+      .order('criado_em',{ascending:false})
+      .limit(50);
+    if(e1)throw e1;
+    if(!turnos||!turnos.length){
       grid.innerHTML='<div class="empty">📭 Nenhum turno encerrado ainda.<br>Use o botão "Encerrar Turno" no painel para salvar o histórico.</div>';
       return;
     }
+
+    // Carregar aeronaves e tarefas separadamente
+    const turnoIds=turnos.map(t=>t.id);
+    const{data:aeronaves,error:e2}=await sb.from('turno_aeronaves')
+      .select('*')
+      .in('turno_id',turnoIds);
+    if(e2)throw e2;
+
+    const aeroIds=(aeronaves||[]).map(a=>a.id);
+    let tarefas=[];
+    if(aeroIds.length){
+      const{data:tt,error:e3}=await sb.from('turno_tarefas')
+        .select('*')
+        .in('turno_aeronave_id',aeroIds);
+      if(e3)throw e3;
+      tarefas=tt||[];
+    }
+
+    // Montar estrutura aninhada manualmente
+    const data=turnos.map(t=>{
+      const aeros=(aeronaves||[])
+        .filter(a=>a.turno_id===t.id)
+        .map(a=>({
+          ...a,
+          turno_tarefas:tarefas.filter(tt=>tt.turno_aeronave_id===a.id)
+        }));
+      return{...t,turno_aeronaves:aeros};
+    });
 
     // Calcular totais acumulados
     let gWO=0,gWOconc=0,gTar=0,gTarConc=0,gDef=0,gFind=0,gAero=0;
