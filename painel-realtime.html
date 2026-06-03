@@ -206,6 +206,58 @@ const LOG={
   success:(msg)=>console.log(`✅ [WO] ${msg}`)
 };
 
+// ═══════════════════════════════════════════════════════════
+// SISTEMA DE ERROS CENTRALIZADO — MRT Pernoite
+// ═══════════════════════════════════════════════════════════
+const ERROS = {
+  // Banco de dados
+  'ERR-001': 'Falha na conexão com o banco de dados',
+  'ERR-002': 'Falha ao carregar aeronaves',
+  'ERR-003': 'Falha ao carregar tarefas',
+  'ERR-004': 'Falha ao salvar dados no banco',
+  // Importação
+  'ERR-010': 'Falha na importação do arquivo',
+  'ERR-011': 'Arquivo inválido ou sem aeronaves com WO',
+  'ERR-012': 'Formato de arquivo não suportado',
+  'ERR-013': 'Falha ao processar PDF',
+  'ERR-014': 'Falha ao processar planilha Excel',
+  // Operações do técnico
+  'ERR-020': 'Falha ao iniciar tarefa',
+  'ERR-021': 'Falha ao concluir tarefa',
+  'ERR-022': 'Falha ao diferir tarefa',
+  'ERR-023': 'Falha ao registrar finding',
+  'ERR-024': 'Falha ao salvar observação',
+  'ERR-025': 'Falha ao resetar tarefa',
+  // Turno
+  'ERR-030': 'Falha ao encerrar turno',
+  'ERR-031': 'Nenhuma WO encontrada para encerrar',
+  'ERR-032': 'Falha ao salvar histórico do turno',
+  // Realtime
+  'ERR-040': 'Conexão em tempo real perdida',
+  'ERR-041': 'Falha ao sincronizar dados',
+  // Histórico / Gestores
+  'ERR-050': 'Falha ao carregar histórico',
+  'ERR-051': 'Falha ao exportar relatório',
+};
+
+function erroMRT(codigo, detalhes='', mostrarUsuario=true){
+  const msg = ERROS[codigo] || 'Erro desconhecido';
+  const texto = `[${codigo}] ${msg}${detalhes ? ': ' + detalhes : ''}`;
+  console.error('❌ MRT ' + texto);
+  if(mostrarUsuario){
+    alert(`❌ ${msg}\n\nCódigo: ${codigo}\n${detalhes ? 'Detalhe: ' + detalhes : ''}\n\nAnote o código e informe ao suporte.`);
+  }
+  return texto;
+}
+
+// Captura erros globais não tratados
+window.addEventListener('error', (e)=>{
+  console.error(`❌ MRT [ERR-000] Erro inesperado: ${e.message} (${e.filename}:${e.lineno})`);
+});
+window.addEventListener('unhandledrejection', (e)=>{
+  console.error(`❌ MRT [ERR-000] Promessa rejeitada: ${e.reason?.message || e.reason}`);
+});
+
 // Heartbeat: mantém o projeto Supabase ativo (evita pausa por inatividade)
 async function heartbeat(){try{await sb.from('aircrafts').select('id',{count:'exact',head:true});}catch(e){}}
 heartbeat();
@@ -232,7 +284,7 @@ async function load(){
     const{data,error}=await sb.from('aircrafts')
       .select('*,tasks(*,findings(*),observations(*))')
       .order('code');
-    if(error)throw error;
+    if(error){erroMRT('ERR-002', error.message); setConn(false); return;}
     // Filtro robusto: apenas aeronaves com WO válida
     const validas=(data||[]).filter(aeronaveValida);
     const ignoradas=(data||[]).length - validas.length;
@@ -752,8 +804,7 @@ async function importar(ev){
     alert(relatorio);
   }catch(err){
     LOG.error(`Falha na importação: ${err.message}`);
-    console.error(err);
-    alert('❌ Erro na importação:\n'+err.message);
+    erroMRT('ERR-010', err.message);
     await load();
   }
   ev.target.value='';
@@ -799,7 +850,7 @@ async function salvarTurno(){
   try{
     const{data:aeros,error}=await sb.from('aircrafts')
       .select('*,tasks(*,findings(*),observations(*))').order('code');
-    if(error||!aeros?.length){alert('❌ Nenhum dado para salvar.');return;}
+    if(error||!aeros?.length){erroMRT('ERR-030','Nenhum dado para salvar. Importe a planilha primeiro.');return;}
 
     // Calcular totais do turno
     let tWO=0,dWO=0,fCount=0;
@@ -816,7 +867,7 @@ async function salvarTurno(){
     });
     
     // Bloquear encerramento sem WOs válidas
-    if(!tWO){alert('❌ Nenhuma WO encontrada. Importe a planilha antes de encerrar o turno.');return;}
+    if(!tWO){erroMRT('ERR-031','Importe a planilha antes de encerrar o turno.');return;}
     
     const pct=tWO?Math.round(dWO/tWO*100):0;
     const hoje=new Date().toISOString().split('T')[0];
@@ -900,7 +951,7 @@ async function salvarTurno(){
       window.open('historico.html','_blank');
     }
   }catch(err){
-    alert('❌ Erro ao salvar turno: '+err.message+'\n\nOs dados NÃO foram apagados. Tente novamente.');
+    erroMRT('ERR-032', err.message+'\n\nOs dados NÃO foram apagados. Tente novamente.');
   }
 }
 

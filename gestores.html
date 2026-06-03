@@ -241,6 +241,58 @@ const LOG={
   success:(msg)=>console.log(`✅ [WO] ${msg}`)
 };
 
+// ═══════════════════════════════════════════════════════════
+// SISTEMA DE ERROS CENTRALIZADO — MRT Pernoite
+// ═══════════════════════════════════════════════════════════
+const ERROS = {
+  // Banco de dados
+  'ERR-001': 'Falha na conexão com o banco de dados',
+  'ERR-002': 'Falha ao carregar aeronaves',
+  'ERR-003': 'Falha ao carregar tarefas',
+  'ERR-004': 'Falha ao salvar dados no banco',
+  // Importação
+  'ERR-010': 'Falha na importação do arquivo',
+  'ERR-011': 'Arquivo inválido ou sem aeronaves com WO',
+  'ERR-012': 'Formato de arquivo não suportado',
+  'ERR-013': 'Falha ao processar PDF',
+  'ERR-014': 'Falha ao processar planilha Excel',
+  // Operações do técnico
+  'ERR-020': 'Falha ao iniciar tarefa',
+  'ERR-021': 'Falha ao concluir tarefa',
+  'ERR-022': 'Falha ao diferir tarefa',
+  'ERR-023': 'Falha ao registrar finding',
+  'ERR-024': 'Falha ao salvar observação',
+  'ERR-025': 'Falha ao resetar tarefa',
+  // Turno
+  'ERR-030': 'Falha ao encerrar turno',
+  'ERR-031': 'Nenhuma WO encontrada para encerrar',
+  'ERR-032': 'Falha ao salvar histórico do turno',
+  // Realtime
+  'ERR-040': 'Conexão em tempo real perdida',
+  'ERR-041': 'Falha ao sincronizar dados',
+  // Histórico / Gestores
+  'ERR-050': 'Falha ao carregar histórico',
+  'ERR-051': 'Falha ao exportar relatório',
+};
+
+function erroMRT(codigo, detalhes='', mostrarUsuario=true){
+  const msg = ERROS[codigo] || 'Erro desconhecido';
+  const texto = `[${codigo}] ${msg}${detalhes ? ': ' + detalhes : ''}`;
+  console.error('❌ MRT ' + texto);
+  if(mostrarUsuario){
+    alert(`❌ ${msg}\n\nCódigo: ${codigo}\n${detalhes ? 'Detalhe: ' + detalhes : ''}\n\nAnote o código e informe ao suporte.`);
+  }
+  return texto;
+}
+
+// Captura erros globais não tratados
+window.addEventListener('error', (e)=>{
+  console.error(`❌ MRT [ERR-000] Erro inesperado: ${e.message} (${e.filename}:${e.lineno})`);
+});
+window.addEventListener('unhandledrejection', (e)=>{
+  console.error(`❌ MRT [ERR-000] Promessa rejeitada: ${e.reason?.message || e.reason}`);
+});
+
 // Heartbeat: mantém Supabase ativo
 async function heartbeat(){try{await sb.from('aircrafts').select('id',{count:'exact',head:true});}catch(e){}}
 heartbeat();
