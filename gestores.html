@@ -321,7 +321,11 @@ async function loadTurno(){
     if(error)throw error;
     renderTurno(data||[]);
     setConn(true);
-  }catch(e){setConn(false);}
+  }catch(e){
+    setConn(false);
+    erroMRT('ERR-002', e.message, false);
+    document.getElementById('ac-list').innerHTML=`<div class="empty">❌ [ERR-002] Erro ao carregar turno.<br><small>${e.message}</small></div>`;
+  }
 }
 
 function renderTurno(data){

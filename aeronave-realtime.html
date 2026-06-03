@@ -486,17 +486,19 @@ async function iniciarWO() {
 }
 
 async function concluir(taskId) {
-  await sb.from('tasks').update({
+  const {error} = await sb.from('tasks').update({
     completed: true,
     completed_at: new Date().toISOString(),
     has_finding: false
   }).eq('id', taskId);
+  if(error){erroMRT('ERR-021', error.message); return;}
   await sb.from('findings').update({ resolved: true }).eq('task_id', taskId);
   await carregarTasks();
 }
 
 async function resolverFinding(taskId) {
-  await sb.from('tasks').update({ has_finding: false }).eq('id', taskId);
+  const {error} = await sb.from('tasks').update({ has_finding: false }).eq('id', taskId);
+  if(error){erroMRT('ERR-023', error.message); return;}
   await sb.from('findings').update({ resolved: true }).eq('task_id', taskId);
   await carregarTasks();
 }
@@ -522,7 +524,8 @@ async function confirmarFinding() {
   const desc = document.getElementById('finding-txt').value.trim();
   if (!desc) { alert('Descreva o finding!'); return; }
   const hora = agora();
-  await sb.from('tasks').update({has_finding:true}).eq('id', findingTaskId);
+  const {error:ef} = await sb.from('tasks').update({has_finding:true}).eq('id', findingTaskId);
+  if(ef){erroMRT('ERR-023', ef.message); return;}
   await sb.from('findings').insert([{task_id:findingTaskId, description:desc}]);
   await sb.from('observations').insert([{
     author: 'Técnico',
@@ -592,11 +595,12 @@ async function confirmarDefer() {
   const obs = document.getElementById('defer-obs').value.trim();
   const hora = agora();
   const motivo = deferMotivoSel + (obs ? ` — ${obs}` : '');
-  await sb.from('tasks').update({
+  const {error:ed} = await sb.from('tasks').update({
     deferred: true,
     defer_reason: motivo,
     started: true
   }).eq('id', deferTaskId);
+  if(ed){erroMRT('ERR-022', ed.message); return;}
   await sb.from('observations').insert([{
     author: 'Técnico',
     task_id: deferTaskId,

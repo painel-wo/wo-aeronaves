@@ -836,10 +836,16 @@ async function encerrarTurno(confirmado=false){
     const{data:aeros}=await sb.from('aircrafts')
       .select('code,tasks(id,wo_number,completed)');
     
+    // Verificar se há aeronaves no banco antes de qualquer coisa
+    if(!aeros||!aeros.length){
+      erroMRT('ERR-031','Nenhuma aeronave no turno. Importe a planilha primeiro.');
+      return;
+    }
+
     const abertas=[];
     (aeros||[]).forEach(ac=>{
       (ac.tasks||[]).forEach(t=>{
-        if(!t.completed) abertas.push(`${ac.code} — WO ${t.wo_number}`);
+        if(!t.completed&&!t.deferred) abertas.push(`${ac.code} — WO ${t.wo_number}`);
       });
     });
 
