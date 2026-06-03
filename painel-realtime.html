@@ -814,6 +814,10 @@ async function salvarTurno(){
       });
       fCount+=tasks.filter(t=>t.has_finding).length;
     });
+    
+    // Bloquear encerramento sem WOs válidas
+    if(!tWO){alert('❌ Nenhuma WO encontrada. Importe a planilha antes de encerrar o turno.');return;}
+    
     const pct=tWO?Math.round(dWO/tWO*100):0;
     const hoje=new Date().toISOString().split('T')[0];
 
