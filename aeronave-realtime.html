@@ -193,6 +193,19 @@ const URL_ = 'https://owyohcqjyiqhabonnstq.supabase.co';
 const KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93eW9oY3FqeWlxaGFib25uc3RxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjMxMzksImV4cCI6MjA5MzczOTEzOX0.nRpYEt7bZdJXCCyVKM5wZQOdo1DOH8oQIEu_swRizIA';
 const sb = window.supabase.createClient(URL_, KEY);
 
+// Heartbeat: mantém Supabase ativo
+async function heartbeat(){try{await sb.from('aircrafts').select('id',{count:'exact',head:true});}catch(e){}}
+heartbeat();
+
+// Validação robusta de aeronave
+function aeronaveValida(ac){
+  if(!ac||!ac.tasks||!ac.tasks.length) return false;
+  return ac.tasks.some(t=>
+    t.wo_number && String(t.wo_number).trim()!=='' &&
+    String(t.wo_number).trim()!=='0' && /\d/.test(String(t.wo_number))
+  );
+}
+
 let curAC = null;        // {id, code, technician}
 let findingTaskId = null;
 let woStarted = false;
@@ -210,8 +223,9 @@ async function carregarAeronaves() {
     const {data,error} = await sb.from('aircrafts')
       .select('*, tasks(*, observations(*))').order('code');
     if (error) throw error;
-    if (!data.length) {
-      list.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:2rem">Nenhuma aeronave.<br>Importe um Excel no painel.</p>';
+    const validas = (data||[]).filter(aeronaveValida);
+    if (!validas.length) {
+      list.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:2rem">Nenhuma aeronave com programação.<br>Importe um Excel no painel.</p>';
       return;
     }
     list.innerHTML = '';
