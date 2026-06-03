@@ -3,271 +3,221 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestores — WO Pernoite</title>
+<title>Gestão MRT — Painel Analítico</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
-.page{max-width:1600px;margin:0 auto;padding:1.5rem}
-
-/* HEADER */
-.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem}
-.logo{font-size:22px;font-weight:500;color:#f8fafc}
-.logo span{color:#3b82f6}
-.header-sub{font-size:12px;color:#475569;margin-top:3px}
-.nav{display:flex;gap:8px}
-.nav a{padding:7px 16px;border-radius:8px;border:0.5px solid #334155;background:#1e293b;color:#94a3b8;font-size:12px;cursor:pointer;text-decoration:none;font-weight:500}
-.nav a:hover{background:#263348;color:#e2e8f0}
-.conn{display:flex;align-items:center;gap:6px;font-size:11px;color:#94a3b8;background:#1e293b;padding:5px 12px;border-radius:20px}
-.conn-dot{width:6px;height:6px;border-radius:50%;background:#10b981}
-.conn-dot.on{animation:blink 2s infinite}
-.conn-dot.off{background:#ef4444;animation:none}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-
-
-/* ═══ MÉTRICAS HISTÓRICAS ═══ */
-.secao-titulo{font-size:13px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin:20px 0 12px;display:flex;align-items:center;gap:8px}
-.secao-titulo::after{content:'';flex:1;height:0.5px;background:#1e293b}
-.kpis-hist{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
-.kpi-hist{background:#1e293b;border-radius:12px;padding:14px 16px;border:0.5px solid #334155;position:relative;overflow:hidden}
-.kpi-hist::before{content:'';position:absolute;top:0;left:0;width:100%;height:2px}
-.kpi-hist.azul::before{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
-.kpi-hist.verde::before{background:linear-gradient(90deg,#10b981,#34d399)}
-.kpi-hist.amarelo::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
-.kpi-hist.roxo::before{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
-.kpi-hist.ciano::before{background:linear-gradient(90deg,#06b6d4,#22d3ee)}
-.kpi-hist-n{font-size:28px;font-weight:700;color:#f8fafc;line-height:1}
-.kpi-hist-l{font-size:10px;color:#64748b;margin-top:5px;text-transform:uppercase;letter-spacing:.5px}
-.kpi-hist-sub{font-size:10px;color:#475569;margin-top:3px}
-
-.grid-metricas{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
-.card-metrica{background:#1e293b;border-radius:12px;border:0.5px solid #334155;padding:18px}
-.card-metrica-titulo{font-size:12px;font-weight:500;color:#94a3b8;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
-
-.ranking-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #1e293b}
-.ranking-item:last-child{border-bottom:none}
-.ranking-badge{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
-.ranking-badge.ouro{background:#78350f;color:#fbbf24}
-.ranking-badge.prata{background:#1e293b;color:#94a3b8;border:0.5px solid #334155}
-.ranking-badge.bronze{background:#431407;color:#fb923c}
-.ranking-badge.normal{background:#0f172a;color:#64748b;border:0.5px solid #1e293b}
-.ranking-codigo{font-size:13px;font-weight:500;color:#e2e8f0;flex:1}
-.ranking-bar-wrap{flex:1;background:#0f172a;border-radius:4px;height:6px;overflow:hidden}
-.ranking-bar{height:100%;border-radius:4px;transition:width .5s}
-.ranking-pct{font-size:11px;font-weight:600;min-width:34px;text-align:right}
-
-.motivo-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid #0f172a}
-.motivo-item:last-child{border-bottom:none}
-.motivo-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.motivo-nome{font-size:12px;color:#e2e8f0;flex:1}
-.motivo-count{font-size:12px;font-weight:600;color:#f8fafc}
-
-.turno-spark{display:flex;align-items:flex-end;gap:4px;height:60px;margin-top:8px}
-.turno-spark-bar{flex:1;border-radius:3px 3px 0 0;transition:height .3s;position:relative;min-height:4px}
-.turno-spark-bar:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#0f172a;color:#e2e8f0;font-size:10px;padding:3px 7px;border-radius:4px;white-space:nowrap;pointer-events:none;border:0.5px solid #334155}
-
-.chart-wrap-hist{position:relative;height:150px}
-
-/* KPIs */
-.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:1.5rem}
-.kpi{background:#1e293b;border-radius:12px;padding:16px 18px;border:0.5px solid #334155;position:relative;overflow:hidden}
-.kpi::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%}
-.kpi.azul::before{background:#3b82f6}
-.kpi.verde::before{background:#10b981}
-.kpi.amarelo::before{background:#fbbf24}
-.kpi.roxo::before{background:#a78bfa}
-.kpi.vermelho::before{background:#f87171}
-.kpi-n{font-size:32px;font-weight:600;color:#f8fafc;line-height:1}
-.kpi-l{font-size:11px;color:#64748b;margin-top:6px;text-transform:uppercase;letter-spacing:.5px}
-.kpi-trend{font-size:11px;margin-top:4px}
-.kpi-trend.up{color:#4ade80}
-.kpi-trend.down{color:#f87171}
-
-/* GRID */
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
-.card{background:#1e293b;border-radius:12px;border:0.5px solid #334155;padding:18px}
-.card-title{font-size:13px;font-weight:500;color:#94a3b8;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center}
-
-/* TURNO ATUAL */
-.turno-status{display:flex;align-items:center;gap:8px;margin-bottom:14px}
-.status-dot{width:10px;height:10px;border-radius:50%}
-.status-dot.ativo{background:#10b981;animation:blink 2s infinite}
-.status-dot.vazio{background:#334155}
-.status-txt{font-size:13px;font-weight:500}
-
-/* AERONAVES */
-.ac-list{display:flex;flex-direction:column;gap:6px}
-.ac-item{display:grid;grid-template-columns:100px 1fr 60px 50px 60px;gap:10px;align-items:center;padding:8px 10px;background:#0f172a;border-radius:8px}
-.ac-code{font-size:13px;font-weight:500;color:#93c5fd}
-.ac-tech{font-size:11px;color:#64748b}
-.prog-wrap{display:flex;align-items:center;gap:8px}
-.prog-bar{flex:1;height:5px;background:#1e293b;border-radius:3px;overflow:hidden}
-.prog-fill{height:100%;border-radius:3px;transition:width .4s}
-.prog-txt{font-size:11px;color:#94a3b8;min-width:28px;text-align:right;font-variant-numeric:tabular-nums}
-.badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:9px;font-weight:500;white-space:nowrap}
-.b-done{background:#052e16;color:#4ade80}
-.b-started{background:#422006;color:#fbbf24}
-.b-pending{background:#1e293b;color:#475569;border:0.5px solid #334155}
-.b-finding{background:#450a0a;color:#f87171;animation:blink 1.5s infinite}
-.mtl-ok{background:#052e16;color:#4ade80;padding:2px 6px;border-radius:6px;font-size:9px;font-weight:500}
-.mtl-nhe{background:#422006;color:#fbbf24;padding:2px 6px;border-radius:6px;font-size:9px;font-weight:500}
-.mtl-tst{background:#3b0764;color:#d8b4fe;padding:2px 6px;border-radius:6px;font-size:9px;font-weight:500}
-
-/* HISTÓRICO CARDS */
-.hist-list{display:flex;flex-direction:column;gap:10px}
-.hist-item{background:#0f172a;border-radius:10px;border-left:3px solid #334155;overflow:hidden}
-.hist-item.bom{border-left-color:#10b981}
-.hist-item.medio{border-left-color:#fbbf24}
-.hist-item.ruim{border-left-color:#f87171}
-.hist-header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;gap:10px}
-.hist-header:hover{background:#162032}
-.hist-date{font-size:12px;font-weight:500;color:#e2e8f0}
-.hist-sub{font-size:10px;color:#64748b;margin-top:2px}
-.hist-pct{font-size:20px;font-weight:600;min-width:48px;text-align:right}
-.hist-pct.bom{color:#4ade80}
-.hist-pct.medio{color:#fbbf24}
-.hist-pct.ruim{color:#f87171}
-.hist-mini{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-.hist-mini-item{font-size:9px;color:#94a3b8;background:#0f172a;padding:2px 6px;border-radius:6px;border:0.5px solid #1e293b;white-space:nowrap}
-.hist-mini-item.verde{color:#4ade80;border-color:#052e16}
-.hist-mini-item.laranja{color:#fcd34d;border-color:#422006}
-.hist-mini-item.vermelho{color:#f87171;border-color:#450a0a}
-.hist-body{display:none;padding:0 12px 10px;border-top:0.5px solid #1e293b}
-.hist-body.open{display:block}
-.hist-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid #1e293b;font-size:11px}
-.hist-row:last-child{border-bottom:none}
-.hist-row-label{color:#64748b}
-.hist-row-val{color:#e2e8f0;font-weight:500;text-align:right}
-.hist-defer-item{background:#1a1000;border-radius:6px;padding:6px 8px;margin-top:4px;font-size:10px}
-.hist-defer-motivo{color:#fcd34d;font-weight:500}
-.hist-defer-tarefa{color:#64748b;margin-top:2px}
-.hist-total{background:#162032;border-radius:10px;border:0.5px solid #334155;padding:12px;margin-top:4px}
-.hist-total-title{font-size:11px;font-weight:500;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
-.hist-total-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.hist-total-item{text-align:center;background:#0f172a;border-radius:6px;padding:6px}
-.hist-total-n{font-size:16px;font-weight:600;color:#f8fafc}
-.hist-total-l{font-size:9px;color:#64748b;text-transform:uppercase;margin-top:2px}
-
-/* FINDINGS ATIVOS */
-.find-list{display:flex;flex-direction:column;gap:6px}
-.find-item{padding:8px 10px;background:#1a0a0a;border-radius:8px;border-left:3px solid #f87171}
-.find-ac{font-size:12px;font-weight:500;color:#f87171}
-.find-wo{font-size:10px;color:#94a3b8;margin-top:1px}
-.find-desc{font-size:11px;color:#fca5a5;margin-top:3px}
-
-/* TÉCNICOS */
-.tec-list{display:flex;flex-direction:column;gap:6px}
-.tec-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0f172a;border-radius:8px}
-.tec-name{font-size:12px;color:#e2e8f0;flex:1}
-.tec-ac{font-size:10px;color:#64748b}
-.tec-prog{font-size:12px;font-weight:500;color:#4ade80}
-
-/* CHART */
-.chart-wrap{position:relative;height:160px}
-
-/* EMPTY/LOADING */
-.loading{text-align:center;padding:2rem;color:#475569;font-size:13px}
-.spinner{width:24px;height:24px;border:2px solid #334155;border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto .75rem}
-@keyframes spin{to{transform:rotate(360deg)}}
-.empty{font-size:12px;color:#475569;text-align:center;padding:1.5rem}
-
-/* CLOCK */
-.clock{font-size:28px;font-weight:300;color:#f8fafc;font-variant-numeric:tabular-nums;letter-spacing:2px}
-.clock-date{font-size:12px;color:#475569;margin-top:2px}
-
-@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.grid-2,.grid-3{grid-template-columns:1fr}}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh}
+.page{max-width:1600px;margin:0 auto;padding:20px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.header-left h1{font-size:20px;font-weight:600;color:#f8fafc}
+.header-left h1 span{color:#3b82f6}
+.header-left p{font-size:12px;color:#475569;margin-top:2px}
+.nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.nav a{padding:6px 14px;border-radius:8px;border:0.5px solid #1e293b;background:#0f172a;color:#64748b;font-size:12px;text-decoration:none;transition:all .2s}
+.nav a:hover{background:#1e293b;color:#e2e8f0}
+.badge-live{display:flex;align-items:center;gap:6px;padding:5px 12px;background:#0f172a;border:0.5px solid #1e293b;border-radius:20px;font-size:11px;color:#64748b}
+.dot{width:6px;height:6px;border-radius:50%;background:#10b981}
+.dot.on{animation:pulse 2s infinite}
+.dot.off{background:#ef4444;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.secao{margin-bottom:28px}
+.secao-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.secao-titulo{font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:1.5px;white-space:nowrap}
+.secao-linha{flex:1;height:0.5px;background:#1e293b}
+.secao-badge{font-size:10px;padding:2px 10px;border-radius:10px;background:#1e293b;color:#64748b;white-space:nowrap}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.grid-2{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.card-c{background:#0f172a;border-radius:14px;padding:18px;border:0.5px solid #1e293b;transition:border-color .2s}
+.card-c:hover{border-color:#334155}
+.cc-icon{font-size:18px;margin-bottom:10px}
+.cc-label{font-size:10px;color:#475569;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.cc-hoje{font-size:38px;font-weight:700;line-height:1;margin-bottom:2px}
+.cc-hist{font-size:11px;color:#334155;margin-bottom:8px}
+.cc-delta{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;border-radius:10px;font-weight:600}
+.up{background:rgba(16,185,129,.15);color:#10b981}
+.dn{background:rgba(248,113,113,.15);color:#f87171}
+.eq{background:rgba(100,116,139,.15);color:#64748b}
+.cc-bar{height:3px;border-radius:2px;margin-top:12px;background:#1e293b;overflow:hidden}
+.cc-fill{height:100%;border-radius:2px;transition:width 1s}
+.card-g{background:#0f172a;border-radius:14px;padding:18px;border:0.5px solid #1e293b}
+.card-g-titulo{font-size:12px;font-weight:500;color:#64748b;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px}
+.card-g-sub{font-size:10px;color:#334155;margin-bottom:12px}
+.cw{position:relative}
+.cw.h150{height:150px}.cw.h180{height:180px}.cw.h200{height:200px}.cw.h240{height:240px}.cw.h120{height:120px}
+.rank-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid #0a0f1e}
+.rank-item:last-child{border-bottom:none}
+.rpos{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.rp1{background:#78350f;color:#fbbf24}
+.rp2{background:#1e293b;color:#94a3b8;border:0.5px solid #334155}
+.rp3{background:#431407;color:#fb923c}
+.rpn{background:#0a0f1e;color:#475569;border:0.5px solid #1e293b}
+.rcod{font-size:12px;font-weight:500;color:#e2e8f0;min-width:72px}
+.rbar-w{flex:1;background:#0a0f1e;border-radius:3px;height:5px;overflow:hidden}
+.rbar{height:100%;border-radius:3px;transition:width .8s}
+.rval{font-size:11px;font-weight:600;min-width:36px;text-align:right}
+.mot-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid #0a0f1e}
+.mot-row:last-child{border-bottom:none}
+.mot-cor{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mot-nome{font-size:11px;color:#94a3b8;flex:1}
+.mot-n{font-size:12px;font-weight:600;color:#f8fafc}
+.mot-pct{font-size:10px;color:#475569;margin-left:3px}
+.iq-centro{text-align:center;padding:10px 0 14px}
+.iq-n{font-size:52px;font-weight:800;line-height:1}
+.iq-sub{font-size:10px;color:#475569;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.iq-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid #0a0f1e}
+.iq-row:last-child{border-bottom:none}
+.iq-row-l{font-size:11px;color:#64748b}
+.iq-row-v{font-size:12px;font-weight:600}
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500}
+.tg{background:rgba(16,185,129,.15);color:#10b981}
+.ta{background:rgba(251,191,36,.15);color:#fbbf24}
+.tr{background:rgba(248,113,113,.15);color:#f87171}
+.empty-state{text-align:center;padding:30px;color:#334155;font-size:12px}
+@media(max-width:1000px){.grid-4{grid-template-columns:1fr 1fr}.grid-2,.grid-3{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- HEADER -->
   <div class="header">
-    <div>
-      <div class="logo">✈ WO Pernoite <span>/ Gestores</span></div>
-      <div class="header-sub">Visão consolidada do turno em tempo real</div>
+    <div class="header-left">
+      <h1>MRT <span>·</span> Painel de Gestão Analítico</h1>
+      <p id="data-atual">—</p>
     </div>
     <div class="nav">
       <a href="painel-realtime.html">📺 Painel TV</a>
+      <a href="aeronave-realtime.html">📱 Técnico</a>
       <a href="historico.html">📋 Histórico</a>
-      <button class="btn" onclick="gerarRelatorioPDF(this)" style="background:#1a0a2e;border-color:#6d28d9;color:#c4b5fd">📄 Relatório PDF</button>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px">
-      <div>
-        <div class="clock" id="clock">--:--:--</div>
-        <div class="clock-date" id="clock-date">--/--/----</div>
-      </div>
-      <div class="conn">
-        <div class="conn-dot off" id="cdot"></div>
+      <a href="index.html">🏠 Início</a>
+      <div class="badge-live">
+        <div class="dot off" id="cdot"></div>
         <span id="clabel">Conectando...</span>
       </div>
     </div>
   </div>
 
-  <!-- KPIs -->
-  <div class="kpis">
-    <div class="kpi azul"><div class="kpi-n" id="k-ac">—</div><div class="kpi-l">Aeronaves no turno</div></div>
-    <div class="kpi verde"><div class="kpi-n" id="k-pct">—</div><div class="kpi-l">% Conclusão geral</div></div>
-    <div class="kpi amarelo"><div class="kpi-n" id="k-and">—</div><div class="kpi-l">WOs em andamento</div></div>
-    <div class="kpi roxo"><div class="kpi-n" id="k-pend">—</div><div class="kpi-l">WOs pendentes</div></div>
-    <div class="kpi vermelho"><div class="kpi-n" id="k-find">—</div><div class="kpi-l">Findings ativos</div></div>
+  <!-- S1: HOJE vs HISTÓRICO -->
+  <div class="secao">
+    <div class="secao-header">
+      <div class="secao-titulo">Último Turno vs Média Histórica</div>
+      <div class="secao-linha"></div>
+      <div class="secao-badge" id="badge-turno">—</div>
+    </div>
+    <div class="grid-4">
+      <div class="card-c">
+        <div class="cc-icon">🎯</div>
+        <div class="cc-label">Taxa de Conclusão</div>
+        <div class="cc-hoje" id="cv-conc" style="color:#3b82f6">—%</div>
+        <div class="cc-hist" id="cv-conc-h">Média histórica: —%</div>
+        <div class="cc-delta eq" id="cv-conc-d">—</div>
+        <div class="cc-bar"><div class="cc-fill" id="cv-conc-b" style="background:#3b82f6"></div></div>
+      </div>
+      <div class="card-c">
+        <div class="cc-icon">📋</div>
+        <div class="cc-label">WOs no Turno</div>
+        <div class="cc-hoje" id="cv-wo" style="color:#a78bfa">—</div>
+        <div class="cc-hist" id="cv-wo-h">Média histórica: —</div>
+        <div class="cc-delta eq" id="cv-wo-d">—</div>
+        <div class="cc-bar"><div class="cc-fill" id="cv-wo-b" style="background:#a78bfa"></div></div>
+      </div>
+      <div class="card-c">
+        <div class="cc-icon">✈️</div>
+        <div class="cc-label">Aeronaves Atendidas</div>
+        <div class="cc-hoje" id="cv-ac" style="color:#06b6d4">—</div>
+        <div class="cc-hist" id="cv-ac-h">Média histórica: —</div>
+        <div class="cc-delta eq" id="cv-ac-d">—</div>
+        <div class="cc-bar"><div class="cc-fill" id="cv-ac-b" style="background:#06b6d4"></div></div>
+      </div>
+      <div class="card-c">
+        <div class="cc-icon">⏱️</div>
+        <div class="cc-label">Duração do Turno</div>
+        <div class="cc-hoje" id="cv-dur" style="color:#f59e0b">—</div>
+        <div class="cc-hist" id="cv-dur-h">Média histórica: —</div>
+        <div class="cc-delta eq" id="cv-dur-d">—</div>
+        <div class="cc-bar"><div class="cc-fill" id="cv-dur-b" style="background:#f59e0b"></div></div>
+      </div>
+    </div>
   </div>
 
-  <!-- LINHA 1: TURNO ATUAL + TÉCNICOS + FINDINGS -->
-  <div class="grid-3">
-
-    <!-- TURNO ATUAL -->
-    <div class="card" style="grid-column:span 2">
-      <div class="card-title">
-        Aeronaves do Turno Atual
-        <span id="turno-resumo" style="font-size:11px;color:#64748b;font-weight:normal;text-transform:none;letter-spacing:0"></span>
+  <!-- S2: TENDÊNCIA -->
+  <div class="secao">
+    <div class="secao-header">
+      <div class="secao-titulo">Tendência de Desempenho</div>
+      <div class="secao-linha"></div>
+      <div class="secao-badge">Últimos 15 turnos</div>
+    </div>
+    <div class="grid-2">
+      <div class="card-g">
+        <div class="card-g-titulo">
+          Taxa de Conclusão por Turno
+          <span class="tag ta" id="tend-media">Média: —%</span>
+        </div>
+        <div class="card-g-sub">Linha tracejada = média histórica · Pontos vermelhos = abaixo da média</div>
+        <div class="cw h240"><canvas id="chart-conc"></canvas></div>
       </div>
-      <div id="ac-list" class="ac-list">
-        <div class="loading"><div class="spinner"></div>Carregando...</div>
+      <div class="card-g">
+        <div class="card-g-titulo">WOs por Turno (concluídas vs pendentes)</div>
+        <div class="card-g-sub">Volume de trabalho noturno</div>
+        <div class="cw h240"><canvas id="chart-wo"></canvas></div>
       </div>
     </div>
-
-    <!-- FINDINGS ATIVOS -->
-    <div class="card">
-      <div class="card-title">⚠ Findings Ativos</div>
-      <div id="find-list" class="find-list">
-        <div class="empty">Sem findings ativos</div>
-      </div>
-    </div>
-
   </div>
 
-  <!-- LINHA 2: GRÁFICO + HISTÓRICO + TÉCNICOS -->
-  <div class="grid-3">
-
-    <!-- GRÁFICO DE PROGRESSO -->
-    <div class="card">
-      <div class="card-title">Progresso por Aeronave</div>
-      <div class="chart-wrap">
-        <canvas id="chart-prog"></canvas>
+  <!-- S3: ANÁLISES -->
+  <div class="secao">
+    <div class="secao-header">
+      <div class="secao-titulo">Rankings e Análises</div>
+      <div class="secao-linha"></div>
+    </div>
+    <div class="grid-3">
+      <div class="card-g">
+        <div class="card-g-titulo">Eficiência por Aeronave <span class="tag ta">% conclusão acumulada</span></div>
+        <div class="card-g-sub">Ordenado pela taxa de conclusão histórica</div>
+        <div id="rank-efic"></div>
+      </div>
+      <div class="card-g">
+        <div class="card-g-titulo">Duração dos Turnos (horas)</div>
+        <div class="card-g-sub">Verde = abaixo da média · Amarelo = acima da média</div>
+        <div class="cw h200"><canvas id="chart-dur"></canvas></div>
+      </div>
+      <div class="card-g">
+        <div class="card-g-titulo">Conclusão por Dia da Semana</div>
+        <div class="card-g-sub">% média de conclusão por dia</div>
+        <div class="cw h200"><canvas id="chart-dia"></canvas></div>
       </div>
     </div>
+  </div>
 
-    <!-- HISTÓRICO RECENTE -->
-    <div class="card">
-      <div class="card-title">Últimos 5 Turnos</div>
-      <div id="hist-list" class="hist-list">
-        <div class="empty">Sem histórico ainda</div>
+  <!-- S4: QUALIDADE -->
+  <div class="secao">
+    <div class="secao-header">
+      <div class="secao-titulo">Qualidade e Eficiência</div>
+      <div class="secao-linha"></div>
+    </div>
+    <div class="grid-3">
+      <div class="card-g">
+        <div class="card-g-titulo">Índice Geral de Qualidade</div>
+        <div class="iq-centro">
+          <div class="iq-n" id="iq-n">—</div>
+          <div class="iq-sub">pontos de 100</div>
+        </div>
+        <div id="iq-det"></div>
+      </div>
+      <div class="card-g">
+        <div class="card-g-titulo">Deferimentos por Motivo</div>
+        <div class="card-g-sub" id="defer-sub">—</div>
+        <div id="mot-lista" style="margin-bottom:10px"></div>
+        <div class="cw h120"><canvas id="chart-mot"></canvas></div>
+      </div>
+      <div class="card-g">
+        <div class="card-g-titulo">Aeronaves Mais Recorrentes</div>
+        <div class="card-g-sub">Número de aparições no histórico</div>
+        <div id="rank-freq"></div>
       </div>
     </div>
-
-    <!-- TÉCNICOS DO TURNO -->
-    <div class="card">
-      <div class="card-title">Técnicos no Turno</div>
-      <div id="tec-list" class="tec-list">
-        <div class="empty">Sem dados</div>
-      </div>
-    </div>
-
   </div>
 
 </div>
@@ -276,501 +226,295 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 const URL_='https://skkikzqbrozrifhermkn.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNra2lrenFicm96cmlmaGVybWtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1ODMwMjYsImV4cCI6MjA5NDE1OTAyNn0.Y37kinB9ofLd0exfMPT9b7rXCvoCwyQzUpZbMGiuFEc';
 const sb=window.supabase.createClient(URL_,KEY);
+const LOG={info:m=>console.log(`ℹ️ [GESTÃO] ${m}`),error:m=>console.error(`❌ [GESTÃO] ${m}`)};
+const charts={};
 
-// Sistema de Logging
-const LOG={
-  info:(msg)=>console.log(`ℹ️ [WO] ${msg}`),
-  warn:(msg)=>console.warn(`⚠️ [WO] ${msg}`),
-  error:(msg)=>console.error(`❌ [WO] ${msg}`),
-  success:(msg)=>console.log(`✅ [WO] ${msg}`)
-};
-
-// ═══════════════════════════════════════════════════════════
-// SISTEMA DE ERROS CENTRALIZADO — MRT Pernoite
-// ═══════════════════════════════════════════════════════════
-const ERROS = {
-  // Banco de dados
-  'ERR-001': 'Falha na conexão com o banco de dados',
-  'ERR-002': 'Falha ao carregar aeronaves',
-  'ERR-003': 'Falha ao carregar tarefas',
-  'ERR-004': 'Falha ao salvar dados no banco',
-  // Importação
-  'ERR-010': 'Falha na importação do arquivo',
-  'ERR-011': 'Arquivo inválido ou sem aeronaves com WO',
-  'ERR-012': 'Formato de arquivo não suportado',
-  'ERR-013': 'Falha ao processar PDF',
-  'ERR-014': 'Falha ao processar planilha Excel',
-  // Operações do técnico
-  'ERR-020': 'Falha ao iniciar tarefa',
-  'ERR-021': 'Falha ao concluir tarefa',
-  'ERR-022': 'Falha ao diferir tarefa',
-  'ERR-023': 'Falha ao registrar finding',
-  'ERR-024': 'Falha ao salvar observação',
-  'ERR-025': 'Falha ao resetar tarefa',
-  // Turno
-  'ERR-030': 'Falha ao encerrar turno',
-  'ERR-031': 'Nenhuma WO encontrada para encerrar',
-  'ERR-032': 'Falha ao salvar histórico do turno',
-  // Realtime
-  'ERR-040': 'Conexão em tempo real perdida',
-  'ERR-041': 'Falha ao sincronizar dados',
-  // Histórico / Gestores
-  'ERR-050': 'Falha ao carregar histórico',
-  'ERR-051': 'Falha ao exportar relatório',
-};
-
-function erroMRT(codigo, detalhes='', mostrarUsuario=true){
-  const msg = ERROS[codigo] || 'Erro desconhecido';
-  const texto = `[${codigo}] ${msg}${detalhes ? ': ' + detalhes : ''}`;
-  console.error('❌ MRT ' + texto);
-  if(mostrarUsuario){
-    alert(`❌ ${msg}\n\nCódigo: ${codigo}\n${detalhes ? 'Detalhe: ' + detalhes : ''}\n\nAnote o código e informe ao suporte.`);
-  }
-  return texto;
-}
-
-// Captura erros globais não tratados
-window.addEventListener('error', (e)=>{
-  console.error(`❌ MRT [ERR-000] Erro inesperado: ${e.message} (${e.filename}:${e.lineno})`);
-});
-window.addEventListener('unhandledrejection', (e)=>{
-  console.error(`❌ MRT [ERR-000] Promessa rejeitada: ${e.reason?.message || e.reason}`);
-});
-
-// Heartbeat: mantém Supabase ativo
 async function heartbeat(){try{await sb.from('aircrafts').select('id',{count:'exact',head:true});}catch(e){}}
 heartbeat();
 
-let chartProg=null;
+const DIAS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+function tick(){document.getElementById('data-atual').textContent=`${DIAS[new Date().getDay()]}, ${new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})} · ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;}
+tick(); setInterval(tick,60000);
 
-// RELÓGIO
-function atualizarRelogio(){
-  const now=new Date();
-  document.getElementById('clock').textContent=now.toLocaleTimeString('pt-BR');
-  document.getElementById('clock-date').textContent=now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-}
-setInterval(atualizarRelogio,1000);
-atualizarRelogio();
-
-function setConn(on){
-  document.getElementById('cdot').className=`conn-dot ${on?'on':'off'}`;
-  document.getElementById('clabel').textContent=on?'Tempo real ✓':'Desconectado';
+function setConn(ok){
+  document.getElementById('cdot').className='dot '+(ok?'on':'off');
+  document.getElementById('cdot').style.background=ok?'#10b981':'#ef4444';
+  document.getElementById('clabel').textContent=ok?'Conectado':'Offline';
 }
 
-// CARREGAR TURNO ATUAL
-async function loadTurno(){
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function fh(h){if(!h||h<=0)return'—';const hh=Math.floor(h),mm=Math.round((h-hh)*60);return`${hh}h${mm>0?mm+'m':''}`;}
+function dl(v,m,s='',inv=false){
+  const d=v-m;
+  if(Math.abs(d)<0.5)return{t:'= histórico',c:'eq'};
+  const pos=inv?d<0:d>0;
+  return{t:`${d>0?'+':''}${Math.round(d)}${s} vs histórico`,c:pos?'up':'dn'};
+}
+function set$(id,txt,cls){const e=document.getElementById(id);if(e){e.textContent=txt;if(cls)e.className=e.className.replace(/(up|dn|eq)/,cls)||cls;}}
+const PC=['rp1','rp2','rp3','rpn','rpn','rpn','rpn','rpn'];
+
+async function carregar(){
   try{
-    const{data,error}=await sb.from('aircrafts')
-      .select('*,tasks(*,findings(*))').order('code');
+    const{data:turnos,error}=await sb.from('turnos')
+      .select('id,data_turno,total_aero,total_wo,wo_concluidas,pct_conclusao,inicio,encerrado_em,criado_em')
+      .order('criado_em',{ascending:false}).limit(20);
     if(error)throw error;
-    renderTurno(data||[]);
+
+    const val=turnos.filter(t=>t.total_wo>0);
+    if(!val.length){document.getElementById('badge-turno').textContent='Sem dados';setConn(true);return;}
+
+    const ids=val.map(t=>t.id);
+    const{data:aeros}=await sb.from('turno_aeronaves')
+      .select('id,turno_id,codigo,wo_total,wo_concluidas,pct_conclusao')
+      .in('turno_id',ids);
+
+    const aIds=(aeros||[]).map(a=>a.id);
+    let defs=[];
+    if(aIds.length){
+      const{data:tt}=await sb.from('turno_tarefas')
+        .select('turno_aeronave_id,deferida,defer_reason')
+        .in('turno_aeronave_id',aIds).eq('deferida',true);
+      defs=tt||[];
+    }
+
     setConn(true);
-  }catch(e){
-    setConn(false);
-    erroMRT('ERR-002', e.message, false);
-    document.getElementById('ac-list').innerHTML=`<div class="empty">❌ [ERR-002] Erro ao carregar turno.<br><small>${e.message}</small></div>`;
-  }
+    render(val, aeros||[], defs);
+  }catch(e){setConn(false);LOG.error(e.message);}
 }
 
-function renderTurno(data){
-  // KPIs — separar WOs únicas de tarefas
-  let tWOunicas=0, dWO=0, sWO=0, pWO=0, tTarefas=0, dTarefas=0, fAtivos=0;
-  data.forEach(ac=>{
-    const tasks=ac.tasks||[];
-    tTarefas+=tasks.length;
-    dTarefas+=tasks.filter(t=>t.completed).length;
-    fAtivos+=tasks.filter(t=>t.has_finding||(t.findings||[]).some(f=>!f.resolved)).length;
+function render(turnos, aeros, defs){
+  const atual=turnos[0];
+  const hist=turnos.slice(1);
+  const t15=[...turnos].slice(0,15).reverse();
 
-    // Agrupar por WO para contar WOs únicas
-    const grupos={};
-    tasks.forEach(t=>{ if(!grupos[t.wo_number]) grupos[t.wo_number]=[]; grupos[t.wo_number].push(t); });
-    Object.values(grupos).forEach(woTasks=>{
-      tWOunicas++;
-      const todoConcluido=woTasks.every(t=>t.completed);
-      const algumStarted=woTasks.some(t=>t.started);
-      if(todoConcluido) dWO++;
-      else if(algumStarted) sWO++;
-      else pWO++;
-    });
-  });
-  const pct=tTarefas?Math.round(dTarefas/tTarefas*100):0;
+  const mConc=hist.length?hist.reduce((s,t)=>s+(t.pct_conclusao||0),0)/hist.length:0;
+  const mWO=hist.length?hist.reduce((s,t)=>s+(t.total_wo||0),0)/hist.length:0;
+  const mAero=hist.length?hist.reduce((s,t)=>s+(t.total_aero||0),0)/hist.length:0;
+  const durs=hist.filter(t=>t.inicio&&t.encerrado_em)
+    .map(t=>(new Date(t.encerrado_em)-new Date(t.inicio))/3600000).filter(h=>h>0&&h<30);
+  const mDur=durs.length?durs.reduce((a,b)=>a+b,0)/durs.length:0;
 
-  document.getElementById('k-ac').textContent=data.length||'—';
-  document.getElementById('k-pct').textContent=tTarefas?(pct+'%'):'—';
-  document.getElementById('k-and').textContent=tWOunicas?sWO:'—';
-  document.getElementById('k-pend').textContent=tWOunicas?pWO:'—';
-  document.getElementById('k-find').textContent=fAtivos||'—';
-  document.getElementById('turno-resumo').textContent=tWOunicas?`${dWO}/${tWOunicas} WOs · ${dTarefas}/${tTarefas} tarefas`:'';
+  // Badge turno
+  document.getElementById('badge-turno').textContent=
+    new Date(atual.data_turno+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});
 
-  // Lista de aeronaves
-  const acList=document.getElementById('ac-list');
-  if(!data.length){
-    acList.innerHTML='<div class="empty">Nenhuma aeronave no turno atual.<br>Importe uma planilha no Painel TV.</div>';
-  } else {
-    acList.innerHTML=data.map(ac=>{
-      const tasks=ac.tasks||[];
-      const done=tasks.filter(t=>t.completed).length;
-      const hasFind=tasks.some(t=>t.has_finding||(t.findings||[]).some(f=>!f.resolved));
-      const started=tasks.filter(t=>t.started&&!t.completed).length;
-      const p=tasks.length?Math.round(done/tasks.length*100):0;
-      const wosU=[...new Set(tasks.map(t=>t.wo_number))];
-      const mo=['TST','NHE','OK',null];
-      const mv=tasks.map(t=>t.material);
-      let mb=null;for(const m of mo){if(mv.includes(m)){mb=m;break;}}
-      const mtlB=mb==='OK'?'<span class="mtl-ok">OK</span>':mb==='NHE'?'<span class="mtl-nhe">NHE</span>':mb==='TST'?'<span class="mtl-tst">TST</span>':'<span style="font-size:10px;color:#334155">—</span>';
-      const cor=p===100?'#10b981':p>50?'#fbbf24':'#3b82f6';
-      let badge=hasFind?'<span class="badge b-finding">⚠ Finding</span>':p===100?'<span class="badge b-done">✓ Concluída</span>':started>0?'<span class="badge b-started">▶ Andamento</span>':'<span class="badge b-pending">Aguardando</span>';
-      return `<div class="ac-item">
-        <div><div class="ac-code">${ac.code}</div><div class="ac-tech">${ac.technician||'—'}</div></div>
-        <div class="prog-wrap">
-          <div class="prog-bar"><div class="prog-fill" style="width:${p}%;background:${cor}"></div></div>
-          <div class="prog-txt">${p}%</div>
-        </div>
-        ${badge}
-        ${mtlB}
-        <div style="font-size:10px;color:#64748b;text-align:right">${wosU.length}WO · ${done}/${tasks.length}tar.</div>
-      </div>`;
-    }).join('');
+  const durA=atual.inicio&&atual.encerrado_em
+    ?(new Date(atual.encerrado_em)-new Date(atual.inicio))/3600000:null;
+
+  // ── COMPARATIVOS
+  const cA=atual.pct_conclusao||0;
+  const corC=cA>=90?'#10b981':cA>=70?'#fbbf24':'#f87171';
+  document.getElementById('cv-conc').textContent=cA+'%';
+  document.getElementById('cv-conc').style.color=corC;
+  document.getElementById('cv-conc-h').textContent=`Média histórica: ${Math.round(mConc)}%`;
+  const dC=dl(cA,mConc,'%');
+  const eC=document.getElementById('cv-conc-d'); eC.textContent=dC.t; eC.className='cc-delta '+dC.c;
+  document.getElementById('cv-conc-b').style.cssText=`background:${corC};width:${cA}%`;
+
+  const wA=atual.total_wo||0;
+  document.getElementById('cv-wo').textContent=wA;
+  document.getElementById('cv-wo-h').textContent=`Média histórica: ${mWO.toFixed(1)} WOs/turno`;
+  const dW=dl(wA,mWO,' WOs'); const eW=document.getElementById('cv-wo-d'); eW.textContent=dW.t; eW.className='cc-delta '+dW.c;
+  document.getElementById('cv-wo-b').style.width=Math.min(wA/20*100,100)+'%';
+
+  const aA=atual.total_aero||0;
+  document.getElementById('cv-ac').textContent=aA;
+  document.getElementById('cv-ac-h').textContent=`Média histórica: ${mAero.toFixed(1)} aeronaves/turno`;
+  const dA=dl(aA,mAero,' aero'); const eA=document.getElementById('cv-ac-d'); eA.textContent=dA.t; eA.className='cc-delta '+dA.c;
+  document.getElementById('cv-ac-b').style.width=Math.min(aA/10*100,100)+'%';
+
+  if(durA&&durA>0){
+    document.getElementById('cv-dur').textContent=fh(durA);
+    document.getElementById('cv-dur-h').textContent=`Média histórica: ${fh(mDur)}`;
+    const dD=dl(durA,mDur,'h',true); const eD=document.getElementById('cv-dur-d'); eD.textContent=dD.t; eD.className='cc-delta '+dD.c;
+    document.getElementById('cv-dur-b').style.width=Math.min(durA/16*100,100)+'%';
+  }else{
+    document.getElementById('cv-dur').textContent='Em andamento';
+    document.getElementById('cv-dur-h').textContent=`Média histórica: ${fh(mDur)}`;
   }
 
-  // Findings ativos
-  const findList=document.getElementById('find-list');
-  const finds=[];
-  data.forEach(ac=>{
-    (ac.tasks||[]).forEach(t=>{
-      if(t.has_finding||(t.findings||[]).some(f=>!f.resolved)){
-        const fs=(t.findings||[]).filter(f=>!f.resolved);
-        finds.push({ac:ac.code,wo:t.wo_number,desc:fs.map(f=>f.description).join(' / ')||'Finding registrado'});
-      }
-    });
-  });
-  findList.innerHTML=finds.length
-    ?finds.map(f=>`<div class="find-item">
-        <div class="find-ac">✈ ${f.ac}</div>
-        <div class="find-wo">WO ${f.wo}</div>
-        <div class="find-desc">${f.desc}</div>
-      </div>`).join('')
-    :'<div class="empty">✅ Nenhum finding ativo</div>';
+  // ── GRÁFICO TENDÊNCIA
+  const labels=t15.map(t=>new Date(t.data_turno+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}));
+  const vConc=t15.map(t=>t.pct_conclusao||0);
+  const mArr=Array(labels.length).fill(Math.round(mConc));
 
-  // Técnicos
-  const tecs={};
-  data.forEach(ac=>{
-    const tech=ac.technician||'Não atribuído';
-    if(!tecs[tech])tecs[tech]={aeros:[],done:0,total:0};
-    tecs[tech].aeros.push(ac.code);
-    const tasks=ac.tasks||[];
-    tecs[tech].total+=tasks.length;
-    tecs[tech].done+=tasks.filter(t=>t.completed).length;
-  });
-  const tecList=document.getElementById('tec-list');
-  const tecArr=Object.entries(tecs);
-  tecList.innerHTML=tecArr.length
-    ?tecArr.map(([name,d])=>{
-      const p=d.total?Math.round(d.done/d.total*100):0;
-      return `<div class="tec-item">
-        <div><div class="tec-name">🪪 ${name}</div><div class="tec-ac">${d.aeros.join(', ')}</div></div>
-        <div class="tec-prog">${p}%</div>
-      </div>`;
-    }).join('')
-    :'<div class="empty">Sem técnicos</div>';
+  document.getElementById('tend-media').textContent=`Média: ${Math.round(mConc)}%`;
+  document.getElementById('tend-media').className='tag '+(mConc>=85?'tg':mConc>=70?'ta':'tr');
 
-  // Gráfico
-  renderGrafico(data);
-}
-
-function renderGrafico(data){
-  const labels=data.map(ac=>ac.code);
-  const valores=data.map(ac=>{
-    const tasks=ac.tasks||[];
-    return tasks.length?Math.round(tasks.filter(t=>t.completed).length/tasks.length*100):0;
-  });
-  const cores=valores.map(v=>v===100?'#10b981':v>50?'#fbbf24':'#3b82f6');
-
-  if(chartProg){chartProg.destroy();}
-  const ctx=document.getElementById('chart-prog').getContext('2d');
-  chartProg=new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels,
-      datasets:[{data:valores,backgroundColor:cores,borderRadius:4,borderSkipped:false}]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
+  dc('conc');
+  charts.conc=new Chart(document.getElementById('chart-conc'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'% Conclusão',data:vConc,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.4,
+       pointBackgroundColor:vConc.map(v=>v>=mConc?'#3b82f6':'#f87171'),pointRadius:5,pointHoverRadius:7,borderWidth:2},
+      {label:'Média',data:mArr,borderColor:'#334155',borderDash:[5,5],borderWidth:1.5,pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{labels:{color:'#475569',font:{size:10},boxWidth:10,padding:12}},
+        tooltip:{backgroundColor:'#0f172a',borderColor:'#334155',borderWidth:1,titleColor:'#f8fafc',bodyColor:'#94a3b8',
+          callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}%`}}
+      },
       scales:{
-        y:{min:0,max:100,ticks:{color:'#475569',font:{size:9},callback:v=>v+'%'},grid:{color:'#1e293b'}},
-        x:{ticks:{color:'#94a3b8',font:{size:9}},grid:{display:false}}
+        y:{min:0,max:100,grid:{color:'rgba(30,41,59,.8)'},ticks:{color:'#475569',font:{size:9},callback:v=>v+'%'}},
+        x:{grid:{display:false},ticks:{color:'#475569',font:{size:9}}}
       }
     }
   });
-}
 
-// HISTÓRICO
-async function loadHistorico(){
-  try{
-    const{data}=await sb.from('turnos')
-      .select('*,turno_aeronaves(*,turno_tarefas!turno_aeronave_id(*))')
-      .order('criado_em',{ascending:false}).limit(10);
-    const list=document.getElementById('hist-list');
-    if(!data?.length){list.innerHTML='<div class="empty">Sem histórico ainda</div>';return;}
-
-    let gTotalWO=0,gConcWO=0,gTotalTar=0,gConcTar=0,gDefTar=0,gFindings=0;
-    const motivosGeral={};
-
-    const itensHtml=data.map((t,idx)=>{
-      const aeros=t.turno_aeronaves||[];
-      const wosU=new Set(),wosConcU=new Set();
-      let tTar=0,tConc=0,tDefer=0;
-      const defs=[];
-      const motivosCount={};
-
-      aeros.forEach(a=>{
-        const tasks=a.turno_tarefas||[];
-        const wos=[...new Set(tasks.map(tk=>tk.wo_number))];
-        wos.forEach(wo=>{
-          wosU.add(a.id+wo);
-          if(tasks.filter(tk=>tk.wo_number===wo).every(tk=>tk.concluida||tk.deferida))
-            wosConcU.add(a.id+wo);
-        });
-        tasks.forEach(tk=>{
-          tTar++;
-          if(tk.concluida)tConc++;
-          if(tk.deferida){
-            tDefer++;
-            const m=tk.defer_reason||'Motivo não informado';
-            motivosCount[m]=(motivosCount[m]||0)+1;
-            motivosGeral[m]=(motivosGeral[m]||0)+1;
-            defs.push({m,wo:tk.wo_number,tar:tk.descricao,ac:a.codigo});
-          }
-        });
-      });
-
-      const totalWO=wosU.size,concWO=wosConcU.size;
-      gTotalWO+=totalWO;gConcWO+=concWO;gTotalTar+=tTar;gConcTar+=tConc;gDefTar+=tDefer;gFindings+=t.total_findings||0;
-
-      const p=tTar?Math.round((tConc+tDefer)/tTar*100):0;
-      const cls=p>=80?'bom':p>=50?'medio':'ruim';
-      const d=t.data_turno?new Date(t.data_turno+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}):'—';
-      const enc=t.encerrado_em?new Date(t.encerrado_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):null;
-
-      const defHtml=defs.length?`<div style="margin-top:8px">
-        <div style="font-size:10px;color:#fcd34d;font-weight:500;margin-bottom:4px">⏸ Deferimentos:</div>
-        ${defs.map(d=>`<div class="hist-defer-item">
-          <div class="hist-defer-motivo">${d.m}</div>
-          <div class="hist-defer-tarefa">✈ ${d.ac} · WO ${d.wo} · ${(d.tar||'').substring(0,55)}</div>
-        </div>`).join('')}</div>`:'';
-
-      const motivHtml=Object.keys(motivosCount).length?
-        Object.entries(motivosCount).map(([m,n])=>`
-          <div class="hist-row"><span class="hist-row-label" style="color:#fcd34d">⏸ ${m}</span>
-          <span class="hist-row-val">${n} tarefa${n!==1?'s':''}</span></div>`).join(''):'';
-
-      return `<div class="hist-item ${cls}">
-        <div class="hist-header" onclick="toggleHist('hb-${idx}')">
-          <div style="flex:1;min-width:0">
-            <div class="hist-date">📅 ${d}</div>
-            <div class="hist-sub">Enc. ${enc||'—'} · ${aeros.length} aeronave${aeros.length!==1?'s':''}</div>
-            <div class="hist-mini">
-              <span class="hist-mini-item">${totalWO} WO</span>
-              <span class="hist-mini-item verde">✓ ${concWO}</span>
-              <span class="hist-mini-item">${tTar} tar.</span>
-              <span class="hist-mini-item verde">✓ ${tConc}</span>
-              ${tDefer>0?`<span class="hist-mini-item laranja">⏸ ${tDefer}</span>`:''}
-              ${t.total_findings>0?`<span class="hist-mini-item vermelho">⚠ ${t.total_findings}</span>`:''}
-            </div>
-          </div>
-          <div class="hist-pct ${cls}">${p}%</div>
-        </div>
-        <div class="hist-body" id="hb-${idx}">
-          <div class="hist-row"><span class="hist-row-label">WOs encerradas</span><span class="hist-row-val">${concWO}/${totalWO}</span></div>
-          <div class="hist-row"><span class="hist-row-label">Tarefas concluídas</span><span class="hist-row-val" style="color:#4ade80">${tConc}/${tTar}</span></div>
-          <div class="hist-row"><span class="hist-row-label">Tarefas deferidas</span><span class="hist-row-val" style="color:${tDefer>0?'#fcd34d':'#4ade80'}">${tDefer}</span></div>
-          <div class="hist-row"><span class="hist-row-label">Findings</span><span class="hist-row-val" style="color:${t.total_findings>0?'#f87171':'#4ade80'}">${t.total_findings||0}</span></div>
-          ${motivHtml}${defHtml}
-        </div>
-      </div>`;
-    }).join('');
-
-    const totalHtml=data.length>=1?`<div class="hist-total">
-      <div class="hist-total-title">📊 Total Geral (${data.length} turno${data.length!==1?'s':''})</div>
-      <div class="hist-total-grid">
-        <div class="hist-total-item"><div class="hist-total-n">${gTotalWO}</div><div class="hist-total-l">WOs Total</div></div>
-        <div class="hist-total-item"><div class="hist-total-n" style="color:#4ade80">${gConcWO}</div><div class="hist-total-l">Encerradas</div></div>
-        <div class="hist-total-item"><div class="hist-total-n">${gTotalTar}</div><div class="hist-total-l">Tarefas Total</div></div>
-        <div class="hist-total-item"><div class="hist-total-n" style="color:#4ade80">${gConcTar}</div><div class="hist-total-l">Concluídas</div></div>
-        <div class="hist-total-item"><div class="hist-total-n" style="color:#fcd34d">${gDefTar}</div><div class="hist-total-l">Deferidas</div></div>
-        <div class="hist-total-item"><div class="hist-total-n" style="color:#f87171">${gFindings}</div><div class="hist-total-l">Findings</div></div>
-      </div>
-      ${Object.keys(motivosGeral).length?`<div style="margin-top:10px;font-size:10px;color:#64748b;margin-bottom:6px">Motivos acumulados:</div>
-        ${Object.entries(motivosGeral).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`
-          <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:0.5px solid #1e293b">
-            <span style="color:#fcd34d">⏸ ${m}</span><span style="color:#e2e8f0;font-weight:500">${n}x</span>
-          </div>`).join('')}`:''}
-    </div>`:'';
-
-    list.innerHTML=itensHtml+totalHtml;
-  }catch(e){console.error('hist err',e);}
-}
-
-function toggleHist(id){
-  const el=document.getElementById(id);
-  if(el)el.classList.toggle('open');
-}
-
-// REALTIME
-sb.channel('gestores-rt')
-  .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},loadTurno)
-  .on('postgres_changes',{event:'*',schema:'public',table:'aircrafts'},loadTurno)
-  .on('postgres_changes',{event:'*',schema:'public',table:'findings'},loadTurno)
-  .on('postgres_changes',{event:'*',schema:'public',table:'turnos'},()=>{loadHistorico();loadMetricasHistoricas();})
-  .subscribe(s=>{
-    setConn(s==='SUBSCRIBED');
-    realtimeOkG=(s==='SUBSCRIBED');
+  const vWOt=t15.map(t=>t.total_wo||0);
+  const vWOc=t15.map(t=>t.wo_concluidas||0);
+  const vWOp=t15.map(t=>(t.total_wo||0)-(t.wo_concluidas||0));
+  dc('wo');
+  charts.wo=new Chart(document.getElementById('chart-wo'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Concluídas',data:vWOc,backgroundColor:'rgba(16,185,129,.75)',borderRadius:3,stack:'s'},
+      {label:'Pendentes',data:vWOp,backgroundColor:'rgba(248,113,113,.5)',borderRadius:3,stack:'s'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{labels:{color:'#475569',font:{size:10},boxWidth:8,padding:8}},
+        tooltip:{backgroundColor:'#0f172a',borderColor:'#334155',borderWidth:1,titleColor:'#f8fafc',bodyColor:'#94a3b8'}
+      },
+      scales:{
+        y:{grid:{color:'rgba(30,41,59,.8)'},ticks:{color:'#475569',font:{size:9}}},
+        x:{grid:{display:false},ticks:{color:'#475569',font:{size:9}}}
+      }
+    }
   });
 
-loadTurno();
-loadHistorico();
-loadMetricasHistoricas();
+  // ── RANKINGS
+  const mAeroMap={};
+  aeros.filter(a=>a.wo_total>0).forEach(a=>{
+    if(!mAeroMap[a.codigo])mAeroMap[a.codigo]={tot:0,conc:0,n:0};
+    mAeroMap[a.codigo].tot+=a.wo_total||0;
+    mAeroMap[a.codigo].conc+=a.wo_concluidas||0;
+    mAeroMap[a.codigo].n++;
+  });
+  const rEfic=Object.entries(mAeroMap)
+    .map(([c,d])=>({c,pct:d.tot>0?Math.round(d.conc/d.tot*100):0,n:d.n}))
+    .sort((a,b)=>b.pct-a.pct).slice(0,8);
 
+  document.getElementById('rank-efic').innerHTML=rEfic.map((r,i)=>{
+    const cor=r.pct>=90?'#10b981':r.pct>=70?'#3b82f6':'#f87171';
+    return `<div class="rank-item"><div class="rpos ${PC[i]}">${i+1}</div>
+      <div class="rcod">${r.c}</div>
+      <div class="rbar-w"><div class="rbar" style="width:${r.pct}%;background:${cor}"></div></div>
+      <div class="rval" style="color:${cor}">${r.pct}%</div></div>`;
+  }).join('');
 
-// ─── GERAR RELATÓRIO PDF DO TURNO ATUAL ────────────────────────────────────
-async function gerarRelatorioPDF(btn){
-  btn.textContent='⏳ Gerando...'; btn.disabled=true;
-  try{
-    // Buscar dados atuais (aircrafts + tasks + findings + observations)
-    const{data,error}=await sb.from('aircrafts')
-      .select('*,tasks(*,findings(*),observations(*))')
-      .order('code');
-    if(error) throw error;
-    if(!data||!data.length) throw new Error('Nenhuma aeronave no turno atual. Importe uma planilha primeiro.');
-
-    const{jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-    const W=doc.internal.pageSize.getWidth();
-    let y=15;
-    const checkY=(h=10)=>{ if(y+h>195){doc.addPage();y=15;} };
-
-    // ── CAPA
-    doc.setFillColor(30,58,138);
-    doc.rect(0,0,W,40,'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(18); doc.setFont('helvetica','bold');
-    doc.text('RELATORIO DO TURNO - WO PERNOITE',W/2,18,{align:'center'});
-    doc.setFontSize(10); doc.setFont('helvetica','normal');
-    doc.text('Relatorio gerado em: '+new Date().toLocaleString('pt-BR'),W/2,28,{align:'center'});
-
-    // ── KPIs resumo
-    let tWO=0,dWO=0,fAtivos=0;
-    data.forEach(ac=>{
-      const tasks=ac.tasks||[];
-      tWO+=tasks.length;
-      dWO+=tasks.filter(t=>t.completed).length;
-      fAtivos+=tasks.filter(t=>t.has_finding||(t.findings||[]).some(f=>!f.resolved)).length;
-    });
-    const pctGeral=tWO?Math.round(dWO/tWO*100):0;
-    doc.text(`${data.length} aeronaves | ${tWO} tarefas | ${dWO} concluidas (${pctGeral}%) | ${fAtivos} finding${fAtivos!==1?'s':''}`,W/2,35,{align:'center'});
-    y=50;
-
-    // ── RESUMO POR AERONAVE
-    doc.setTextColor(30,58,138);
-    doc.setFontSize(12); doc.setFont('helvetica','bold');
-    doc.text('RESUMO POR AERONAVE',14,y); y+=5;
-
-    doc.autoTable({
-      startY:y,
-      head:[['Aeronave','Tecnico','WOs unicas','Tarefas','Concluidas','Pendentes','MTL Critico','Finding','%']],
-      body:data.map(ac=>{
-        const tasks=ac.tasks||[];
-        const done=tasks.filter(t=>t.completed).length;
-        const wosU=[...new Set(tasks.map(t=>t.wo_number))];
-        const hasFind=tasks.some(t=>t.has_finding||(t.findings||[]).some(f=>!f.resolved));
-        const mo=['TST','NHE','OK',null];
-        const mv=tasks.map(t=>t.material);
-        let mb=null; for(const m of mo){if(mv.includes(m)){mb=m;break;}}
-        return[ac.code,ac.technician||'—',wosU.length,tasks.length,done,tasks.length-done,mb||'—',hasFind?'SIM':'—',tWO?Math.round(done/tasks.length*100)+'%':'—'];
-      }),
-      styles:{fontSize:8,cellPadding:3},
-      headStyles:{fillColor:[30,58,138],textColor:255,fontStyle:'bold'},
-      alternateRowStyles:{fillColor:[241,245,249]},
-      margin:{left:14,right:14},
-    });
-    y=doc.lastAutoTable.finalY+12;
-
-    // ── DETALHE POR AERONAVE
-    data.forEach(ac=>{
-      const tasks=ac.tasks||[];
-      if(!tasks.length) return;
-
-      checkY(18);
-      doc.setFillColor(30,41,59);
-      doc.rect(14,y,W-28,8,'F');
-      doc.setTextColor(255,255,255);
-      doc.setFontSize(10); doc.setFont('helvetica','bold');
-      doc.text('AERONAVE: '+ac.code+' — '+( ac.technician||'—'),16,y+5.5);
-      const doneCnt=tasks.filter(t=>t.completed).length;
-      doc.setFont('helvetica','normal'); doc.setFontSize(8);
-      doc.text(doneCnt+'/'+tasks.length+' tarefas concluidas',W-16,y+5.5,{align:'right'});
-      y+=12;
-
-      // Agrupar por WO
-      const grupos={};
-      tasks.forEach(t=>{ if(!grupos[t.wo_number]) grupos[t.wo_number]=[]; grupos[t.wo_number].push(t); });
-
-      const rows=[];
-      Object.entries(grupos).forEach(([woNum,woTasks])=>{
-        woTasks.forEach((task,i)=>{
-          const obs=(task.observations||[]).sort((a,b)=>(a.recorded_at||'').localeCompare(b.recorded_at||''));
-          const finds=(task.findings||[]).map(f=>(f.resolved?'[OK] ':'')+( f.description||'')).join('\n');
-          const obsText=obs.map(o=>`${o.recorded_at||'--:--'} ${o.text||''}`).join('\n');
-          rows.push([
-            i===0?woNum:'',
-            (task.description||'').substring(0,65)+(task.description?.length>65?'...':''),
-            task.completed?'Concluida':'Pendente',
-            task.material||'—',
-            finds||'—',
-            obsText||'—'
-          ]);
-        });
-      });
-
-      if(rows.length){
-        doc.autoTable({
-          startY:y,
-          head:[['WO','Descricao da Tarefa','Status','MTL','Findings','Observacoes']],
-          body:rows,
-          styles:{fontSize:7,cellPadding:2,overflow:'linebreak'},
-          headStyles:{fillColor:[51,65,85],textColor:255,fontSize:7},
-          columnStyles:{
-            0:{cellWidth:18},1:{cellWidth:65},2:{cellWidth:18},
-            3:{cellWidth:10},4:{cellWidth:35},5:{cellWidth:W-28-146}
-          },
-          margin:{left:14,right:14},
-          didParseCell:(d)=>{
-            if(d.column.index===2&&d.cell.raw==='Concluida'){d.cell.styles.textColor=[74,222,128];d.cell.styles.fontStyle='bold';}
-            if(d.column.index===2&&d.cell.raw==='Pendente'){d.cell.styles.textColor=[251,191,36];}
-            if(d.column.index===4&&d.cell.raw&&d.cell.raw!=='—'){d.cell.styles.textColor=[248,113,113];}
-          }
-        });
-        y=doc.lastAutoTable.finalY+8;
+  // ── DURAÇÃO
+  const tDur=t15.filter(t=>t.inicio&&t.encerrado_em);
+  const lDur=tDur.map(t=>new Date(t.data_turno+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}));
+  const vDur=tDur.map(t=>{const h=(new Date(t.encerrado_em)-new Date(t.inicio))/3600000;return h>0&&h<30?+h.toFixed(1):null;});
+  dc('dur');
+  charts.dur=new Chart(document.getElementById('chart-dur'),{
+    type:'bar',
+    data:{labels:lDur,datasets:[{label:'Horas',data:vDur,
+      backgroundColor:vDur.map(v=>v===null?'transparent':v<=mDur?'rgba(16,185,129,.7)':'rgba(251,191,36,.6)'),
+      borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#0f172a',borderColor:'#334155',borderWidth:1,titleColor:'#f8fafc',bodyColor:'#94a3b8',callbacks:{label:c=>`${c.parsed.y}h`}}},
+      scales:{
+        y:{grid:{color:'rgba(30,41,59,.8)'},ticks:{color:'#475569',font:{size:9},callback:v=>v+'h'}},
+        x:{grid:{display:false},ticks:{color:'#475569',font:{size:9}}}
       }
-    });
+    }
+  });
 
-    const hoje=new Date().toISOString().split('T')[0];
-    doc.save('WO_Turno_'+hoje+'.pdf');
-    btn.textContent='📄 Relatório PDF'; btn.disabled=false;
-  }catch(e){
-    alert('Erro ao gerar PDF:\n'+e.message);
-    btn.textContent='📄 Relatório PDF'; btn.disabled=false;
+  // ── DIA DA SEMANA
+  const dDia=Array(7).fill(null).map(()=>({s:0,n:0}));
+  turnos.filter(t=>t.total_wo>0).forEach(t=>{
+    const d=new Date(t.data_turno+'T12:00').getDay();
+    dDia[d].s+=(t.pct_conclusao||0); dDia[d].n++;
+  });
+  const vDia=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map((_,i)=>dDia[i].n>0?Math.round(dDia[i].s/dDia[i].n):null);
+  dc('dia');
+  charts.dia=new Chart(document.getElementById('chart-dia'),{
+    type:'radar',
+    data:{labels:['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'],datasets:[{
+      label:'% Conclusão média',data:vDia,backgroundColor:'rgba(139,92,246,.2)',
+      borderColor:'#8b5cf6',pointBackgroundColor:'#8b5cf6',borderWidth:2,pointRadius:4
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#0f172a',borderColor:'#334155',borderWidth:1,titleColor:'#f8fafc',bodyColor:'#94a3b8',callbacks:{label:c=>`${c.parsed.r||0}%`}}},
+      scales:{r:{min:0,max:100,grid:{color:'rgba(30,41,59,.8)'},
+        ticks:{color:'#475569',font:{size:8},backdropColor:'transparent',stepSize:25},
+        pointLabels:{color:'#64748b',font:{size:10}}}}
+    }
+  });
+
+  // ── ÍNDICE DE QUALIDADE
+  const qtotal=turnos.filter(t=>t.total_wo>0);
+  const q100=qtotal.filter(t=>t.pct_conclusao===100).length;
+  const qPont=Math.round(q100/qtotal.length*100);
+  const qConc=Math.round(mConc);
+  const totTar=aeros.reduce((s,a)=>s+(a.wo_total||0),0);
+  const qNDef=totTar>0?Math.round((1-defs.length/totTar)*100):100;
+  const iq=Math.round((qConc+qPont+qNDef)/3);
+  const corIQ=iq>=85?'#10b981':iq>=70?'#fbbf24':'#f87171';
+  document.getElementById('iq-n').textContent=iq;
+  document.getElementById('iq-n').style.color=corIQ;
+  document.getElementById('iq-det').innerHTML=[
+    ['Conclusão média',qConc+'%',qConc>=85?'#10b981':qConc>=70?'#fbbf24':'#f87171'],
+    ['Turnos 100% concluídos',`${q100}/${qtotal.length} · ${qPont}%`,'#3b82f6'],
+    ['Tarefas sem deferimento',qNDef+'%',qNDef>=95?'#10b981':'#fbbf24'],
+    ['Base de análise',`${qtotal.length} turnos`,'#475569']
+  ].map(([l,v,c])=>`<div class="iq-row"><div class="iq-row-l">${l}</div><div class="iq-row-v" style="color:${c}">${v}</div></div>`).join('');
+
+  // ── DEFERIMENTOS
+  const mots={};
+  defs.forEach(d=>{const m=(d.defer_reason||'Não informado').split(' — ')[0].trim().substring(0,28);mots[m]=(mots[m]||0)+1;});
+  const mOrd=Object.entries(mots).sort((a,b)=>b[1]-a[1]);
+  const totDef=defs.length;
+  const CM=['#f87171','#fbbf24','#fb923c','#a78bfa','#60a5fa','#34d399'];
+
+  document.getElementById('defer-sub').textContent=totDef>0
+    ?`${totDef} deferimento${totDef>1?'s':''} no histórico`
+    :'Nenhum deferimento registrado';
+
+  if(mOrd.length){
+    document.getElementById('mot-lista').innerHTML=mOrd.slice(0,4).map(([m,n],i)=>
+      `<div class="mot-row"><div class="mot-cor" style="background:${CM[i]}"></div>
+       <div class="mot-nome">${m}</div>
+       <div class="mot-n">${n}</div>
+       <div class="mot-pct">${Math.round(n/totDef*100)}%</div></div>`).join('');
+    dc('mot');
+    charts.mot=new Chart(document.getElementById('chart-mot'),{
+      type:'doughnut',
+      data:{labels:mOrd.map(([m])=>m),datasets:[{data:mOrd.map(([,n])=>n),backgroundColor:CM,borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom',labels:{color:'#475569',font:{size:9},boxWidth:7,padding:6}}}}
+    });
+  }else{
+    document.getElementById('mot-lista').innerHTML='<div style="color:#475569;font-size:12px;text-align:center;padding:18px 0">✅ Nenhum deferimento</div>';
   }
+
+  // ── FREQUÊNCIA
+  const fOrd=Object.entries(mAeroMap).sort((a,b)=>b[1].n-a[1].n).slice(0,8);
+  const maxF=fOrd[0]?.[1].n||1;
+  document.getElementById('rank-freq').innerHTML=fOrd.map(([c,d],i)=>
+    `<div class="rank-item"><div class="rpos ${PC[i]}">${i+1}</div>
+     <div class="rcod">${c}</div>
+     <div class="rbar-w"><div class="rbar" style="width:${d.n/maxF*100}%;background:#6366f1"></div></div>
+     <div class="rval" style="color:#a5b4fc">${d.n}x</div></div>`).join('');
+
+  LOG.info('Dashboard renderizado');
 }
 
-let realtimeOkG = false;
-setInterval(()=>{ if(!realtimeOkG){ loadTurno(); loadHistorico(); }}, 20000);
+// Realtime
+let rtOk=false;
+sb.channel('gestao-rt')
+  .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},carregar)
+  .on('postgres_changes',{event:'*',schema:'public',table:'turnos'},carregar)
+  .subscribe(s=>{rtOk=(s==='SUBSCRIBED');setConn(rtOk);});
 
-// Reconectar ao voltar para a aba
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'){ loadTurno(); loadHistorico(); }
-});
+setInterval(()=>{if(!rtOk)carregar();},20000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')carregar();});
+carregar();
 </script>
 </body>
 </html>
