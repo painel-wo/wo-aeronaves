@@ -63,7 +63,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 .act.find-btn{background:#fee2e2;color:#991b1b;border-color:#fecaca}
 .act.defer-btn{background:#fef3c7;color:#92400e;border-color:#fde68a}
 .act.obs-btn{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
-.act.reset-btn{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
 
 /* MTL */
 .mtl-section{padding:0 .875rem .625rem}
@@ -189,74 +188,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 <div id="screen-tasks" class="tasks-wrap" style="display:none"></div>
 
 <script>
-const URL_ = 'https://skkikzqbrozrifhermkn.supabase.co';
-const KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNra2lrenFicm96cmlmaGVybWtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1ODMwMjYsImV4cCI6MjA5NDE1OTAyNn0.Y37kinB9ofLd0exfMPT9b7rXCvoCwyQzUpZbMGiuFEc';
+const URL_ = 'https://owyohcqjyiqhabonnstq.supabase.co';
+const KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93eW9oY3FqeWlxaGFib25uc3RxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjMxMzksImV4cCI6MjA5MzczOTEzOX0.nRpYEt7bZdJXCCyVKM5wZQOdo1DOH8oQIEu_swRizIA';
 const sb = window.supabase.createClient(URL_, KEY);
-
-
-// ═══════════════════════════════════════════════════════════
-// SISTEMA DE ERROS CENTRALIZADO — MRT Pernoite
-// ═══════════════════════════════════════════════════════════
-const ERROS = {
-  // Banco de dados
-  'ERR-001': 'Falha na conexão com o banco de dados',
-  'ERR-002': 'Falha ao carregar aeronaves',
-  'ERR-003': 'Falha ao carregar tarefas',
-  'ERR-004': 'Falha ao salvar dados no banco',
-  // Importação
-  'ERR-010': 'Falha na importação do arquivo',
-  'ERR-011': 'Arquivo inválido ou sem aeronaves com WO',
-  'ERR-012': 'Formato de arquivo não suportado',
-  'ERR-013': 'Falha ao processar PDF',
-  'ERR-014': 'Falha ao processar planilha Excel',
-  // Operações do técnico
-  'ERR-020': 'Falha ao iniciar tarefa',
-  'ERR-021': 'Falha ao concluir tarefa',
-  'ERR-022': 'Falha ao diferir tarefa',
-  'ERR-023': 'Falha ao registrar finding',
-  'ERR-024': 'Falha ao salvar observação',
-  'ERR-025': 'Falha ao resetar tarefa',
-  // Turno
-  'ERR-030': 'Falha ao encerrar turno',
-  'ERR-031': 'Nenhuma WO encontrada para encerrar',
-  'ERR-032': 'Falha ao salvar histórico do turno',
-  // Realtime
-  'ERR-040': 'Conexão em tempo real perdida',
-  'ERR-041': 'Falha ao sincronizar dados',
-  // Histórico / Gestores
-  'ERR-050': 'Falha ao carregar histórico',
-  'ERR-051': 'Falha ao exportar relatório',
-};
-
-function erroMRT(codigo, detalhes='', mostrarUsuario=true){
-  const msg = ERROS[codigo] || 'Erro desconhecido';
-  const texto = `[${codigo}] ${msg}${detalhes ? ': ' + detalhes : ''}`;
-  console.error('❌ MRT ' + texto);
-  if(mostrarUsuario){
-    alert(`❌ ${msg}\n\nCódigo: ${codigo}\n${detalhes ? 'Detalhe: ' + detalhes : ''}\n\nAnote o código e informe ao suporte.`);
-  }
-  return texto;
-}
-
-// Captura erros globais não tratados
-window.addEventListener('error', (e)=>{
-  console.error(`❌ MRT [ERR-000] Erro inesperado: ${e.message} (${e.filename}:${e.lineno})`);
-});
-window.addEventListener('unhandledrejection', (e)=>{
-  console.error(`❌ MRT [ERR-000] Promessa rejeitada: ${e.reason?.message || e.reason}`);
-});
-// Heartbeat: mantém Supabase ativo
-async function heartbeat(){try{await sb.from('aircrafts').select('id',{count:'exact',head:true});}catch(e){}}
-heartbeat();
-
-// Validação robusta de aeronave
-function aeronaveValida(ac){
-  if(!ac||!ac.tasks||!ac.tasks.length) return false;
-  return ac.tasks.some(t=>
-    t.wo_number && String(t.wo_number).trim()!=='' &&
-    String(t.wo_number).trim()!=='0' && /\d/.test(String(t.wo_number))
-  );
-}
 
 let curAC = null;        // {id, code, technician}
 let findingTaskId = null;
@@ -274,10 +208,9 @@ async function carregarAeronaves() {
   try {
     const {data,error} = await sb.from('aircrafts')
       .select('*, tasks(*, observations(*))').order('code');
-    if (error){erroMRT('ERR-002', error.message); return;}
-    const validas = (data||[]).filter(aeronaveValida);
-    if (!validas.length) {
-      list.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:2rem">Nenhuma aeronave com programação.<br>Importe um Excel no painel.</p>';
+    if (error) throw error;
+    if (!data.length) {
+      list.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:2rem">Nenhuma aeronave.<br>Importe um Excel no painel.</p>';
       return;
     }
     list.innerHTML = '';
@@ -294,7 +227,7 @@ async function carregarAeronaves() {
         <div class="ac-card-code">${ac.code}</div>
         <div class="ac-card-tech">🪪 ${ac.technician||'Não atribuído'}</div>
         <div class="ac-card-meta">
-          <span>📋 ${tasks.length} Tarefas</span>
+          <span>📋 ${tasks.length} WOs</span>
           <span>✓ ${pct}%</span>
           ${obsCount ? `<span style="color:#3b82f6;font-weight:500">💬 ${obsCount} obs</span>` : ''}
           ${deferred ? `<span style="color:#d97706;font-weight:500">⏸ ${deferred}</span>` : ''}
@@ -304,7 +237,12 @@ async function carregarAeronaves() {
       list.appendChild(btn);
     });
   } catch(e) {
-    list.innerHTML = `<p style="color:#ef4444;padding:1rem">Erro: ${e.message}</p>`;
+    const semInternet = e.message?.includes('fetch') || e.message?.includes('network');
+    list.innerHTML = `<p style="color:#ef4444;padding:1.5rem;text-align:center">
+      ${semInternet
+        ? '📶 Sem conexão com o banco de dados.<br>Verifique a internet e tente novamente.'
+        : '⚠️ Não foi possível carregar as aeronaves.<br>Aguarde e recarregue a página.'}
+    </p>`;
   }
 }
 
@@ -343,10 +281,15 @@ async function carregarTasks() {
       .select('*, observations(*), findings(*)')
       .eq('aircraft_id', curAC.id)
       .order('created_at');
-    if (error){erroMRT('ERR-002', error.message); return;}
+    if (error) throw error;
     renderTasks(data||[]);
   } catch(e) {
-    wrap.innerHTML = `<p style="color:#ef4444;padding:1rem">Erro: ${e.message}</p>`;
+    const semInternet = e.message?.includes('fetch') || e.message?.includes('network');
+    wrap.innerHTML = `<p style="color:#ef4444;padding:1.5rem;text-align:center">
+      ${semInternet
+        ? '📶 Sem conexão com o banco de dados.<br>Verifique a internet e tente novamente.'
+        : '⚠️ Não foi possível carregar as tarefas.<br>Volte e tente abrir a aeronave novamente.'}
+    </p>`;
   }
 }
 
@@ -370,14 +313,7 @@ function renderTasks(tasks) {
       ${isStarted ? '✓ Trabalho iniciado' : '▶ Iniciar trabalho na aeronave'}
     </button>`;
 
-  // Ordenação: abertas primeiro, concluídas/deferidas depois
-  const tasksSorted = [...tasks].sort((a,b)=>{
-    const aDone=a.completed||a.deferred, bDone=b.completed||b.deferred;
-    if(aDone&&!bDone) return 1;
-    if(!aDone&&bDone) return -1;
-    return 0;
-  });
-  const cardsHtml = tasksSorted.map(task => {
+  const cardsHtml = tasks.map(task => {
     const hasFind = task.has_finding || (task.findings||[]).some(f=>!f.resolved);
     const isDef = task.deferred;
     const cls = task.completed ? 'completed' : isDef ? 'deferred' : hasFind ? 'finding' : '';
@@ -425,7 +361,6 @@ function renderTasks(tasks) {
         <button class="act find-btn" ${task.completed||isDef?'disabled':''} onclick="abrirFinding('${task.id}')">⚠ Finding</button>
         <button class="act defer-btn" ${task.completed||isDef?'disabled':''} onclick="abrirDefer('${task.id}')">⏸ Diferir</button>
         <button class="act obs-btn" onclick="abrirObs('${task.id}')">📝 Obs ${obs.length?`(${obs.length})`:''}</button>
-        ${task.started||task.completed||isDef ? `<button class="act reset-btn" onclick="resetarTarefa('${task.id}')">🔄 Resetar</button>` : ''}
         ${hasFind ? `<button class="act" style="grid-column:1/-1;background:#dcfce7;color:#166534;border-color:#bbf7d0;font-size:12px" onclick="resolverFinding('${task.id}')">✅ Resolver Finding</button>` : ''}
       </div>
 
@@ -470,7 +405,6 @@ function subscrever() {
   }
   canalAtivo = sb.channel('tasks-rt-' + curAC.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'tasks',filter:`aircraft_id=eq.${curAC.id}`}, carregarTasks)
-      .on('postgres_changes',{event:'*',schema:'public',table:'aircrafts'}, carregarAeronaves)
     .on('postgres_changes',{event:'*',schema:'public',table:'observations'}, carregarTasks)
     .on('postgres_changes',{event:'*',schema:'public',table:'findings'}, carregarTasks)
     .subscribe();
@@ -494,19 +428,17 @@ async function iniciarWO() {
 }
 
 async function concluir(taskId) {
-  const {error} = await sb.from('tasks').update({
+  await sb.from('tasks').update({
     completed: true,
     completed_at: new Date().toISOString(),
     has_finding: false
   }).eq('id', taskId);
-  if(error){erroMRT('ERR-021', error.message); return;}
   await sb.from('findings').update({ resolved: true }).eq('task_id', taskId);
   await carregarTasks();
 }
 
 async function resolverFinding(taskId) {
-  const {error} = await sb.from('tasks').update({ has_finding: false }).eq('id', taskId);
-  if(error){erroMRT('ERR-023', error.message); return;}
+  await sb.from('tasks').update({ has_finding: false }).eq('id', taskId);
   await sb.from('findings').update({ resolved: true }).eq('task_id', taskId);
   await carregarTasks();
 }
@@ -530,10 +462,9 @@ function fecharModal() {
 
 async function confirmarFinding() {
   const desc = document.getElementById('finding-txt').value.trim();
-  if (!desc) { alert('Descreva o finding!'); return; }
+  if (!desc) { alert('⚠️ Descreva o problema encontrado antes de registrar o finding!'); return; }
   const hora = agora();
-  const {error:ef} = await sb.from('tasks').update({has_finding:true}).eq('id', findingTaskId);
-  if(ef){erroMRT('ERR-023', ef.message); return;}
+  await sb.from('tasks').update({has_finding:true}).eq('id', findingTaskId);
   await sb.from('findings').insert([{task_id:findingTaskId, description:desc}]);
   await sb.from('observations').insert([{
     author: 'Técnico',
@@ -562,7 +493,7 @@ function fecharModalObs() {
 
 async function confirmarObs() {
   const texto = document.getElementById('obs-txt').value.trim();
-  if (!texto) { alert('Digite a observação!'); return; }
+  if (!texto) { alert('⚠️ Digite a observação antes de enviar!'); return; }
   const hora = agora();
   const {error} = await sb.from('observations').insert([{
     author: 'Técnico',
@@ -570,7 +501,7 @@ async function confirmarObs() {
     text: texto,
     recorded_at: hora
   }]);
-  if(error){ alert('Erro ao registrar: '+error.message); return; }
+  if(error){ alert('⚠️ Não foi possível salvar a observação.\nVerifique a internet e tente novamente.'); return; }
   fecharModalObs();
   await carregarTasks();
 }
@@ -596,27 +527,18 @@ function selecionarMotivo(btn, motivo) {
   document.querySelectorAll('.defer-reason-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   deferMotivoSel = motivo;
-  const obsInput = document.getElementById('defer-obs');
-  if(motivo === 'Outro'){
-    obsInput.placeholder = '⚠️ Descreva o motivo (obrigatório)';
-    obsInput.style.borderColor = '#f59e0b';
-  } else {
-    obsInput.placeholder = 'Observação adicional (opcional)';
-    obsInput.style.borderColor = '#334155';
-  }
 }
 
 async function confirmarDefer() {
-  if (!deferMotivoSel) { alert('Selecione o motivo do deferimento!'); return; }
+  if (!deferMotivoSel) { alert('⚠️ Selecione o motivo do deferimento antes de confirmar!'); return; }
   const obs = document.getElementById('defer-obs').value.trim();
   const hora = agora();
   const motivo = deferMotivoSel + (obs ? ` — ${obs}` : '');
-  const {error:ed} = await sb.from('tasks').update({
+  await sb.from('tasks').update({
     deferred: true,
     defer_reason: motivo,
     started: true
   }).eq('id', deferTaskId);
-  if(ed){erroMRT('ERR-022', ed.message); return;}
   await sb.from('observations').insert([{
     author: 'Técnico',
     task_id: deferTaskId,
@@ -624,22 +546,6 @@ async function confirmarDefer() {
     recorded_at: hora
   }]);
   fecharModalDefer();
-  await carregarTasks();
-}
-
-// ─── RESETAR TAREFA ─────────────────────────────────────────
-async function resetarTarefa(taskId) {
-  if (!confirm('🔄 Resetar esta tarefa?\n\nIsso vai voltar a tarefa para o estado inicial (não iniciada), removendo:\n• Status iniciada\n• Status concluída\n• Status deferida\n\nConfirma?')) return;
-  
-  await sb.from('tasks').update({
-    started: false,
-    started_at: null,
-    completed: false,
-    completed_at: null,
-    deferred: false,
-    defer_reason: null
-  }).eq('id', taskId);
-  
   await carregarTasks();
 }
 
