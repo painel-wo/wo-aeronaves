@@ -262,6 +262,27 @@ window.addEventListener('unhandledrejection', (e)=>{
 async function heartbeat(){try{await sb.from('aircrafts').select('id',{count:'exact',head:true});}catch(e){}}
 heartbeat();
 
+
+// ── Verificação de saúde da conexão (detecta chave inválida)
+async function verificarConexao(){
+  try{
+    const{error}=await sb.from('aircrafts').select('id',{count:'exact',head:true});
+    if(error&&(error.status===401||error.status===403)){
+      mostrarAlertaChave(); return false;
+    }
+    return true;
+  }catch(e){ return false; }
+}
+function mostrarAlertaChave(){
+  if(document.getElementById('banner-chave'))return;
+  const b=document.createElement('div');
+  b.id='banner-chave';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#7f1d1d;color:#fca5a5;padding:12px 20px;text-align:center;font-size:14px;font-weight:600;';
+  b.innerHTML='⚠️ Chave de acesso inválida ou expirada! O sistema não consegue salvar dados. <a href="https://supabase.com/dashboard" target="_blank" style="color:#fbbf24;text-decoration:underline">Atualizar no Supabase</a> — Código: ERR-001';
+  document.body.prepend(b);
+  LOG.error('CHAVE INVÁLIDA — sistema em modo somente leitura');
+}
+
 // Estado dos painéis abertos
 const openPanels = new Set();
 

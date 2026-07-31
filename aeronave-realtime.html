@@ -370,7 +370,14 @@ function renderTasks(tasks) {
       ${isStarted ? '✓ Trabalho iniciado' : '▶ Iniciar trabalho na aeronave'}
     </button>`;
 
-  const cardsHtml = tasks.map(task => {
+  // Ordenação: abertas primeiro, concluídas/deferidas depois
+  const tasksSorted = [...tasks].sort((a,b)=>{
+    const aDone=a.completed||a.deferred, bDone=b.completed||b.deferred;
+    if(aDone&&!bDone) return 1;
+    if(!aDone&&bDone) return -1;
+    return 0;
+  });
+  const cardsHtml = tasksSorted.map(task => {
     const hasFind = task.has_finding || (task.findings||[]).some(f=>!f.resolved);
     const isDef = task.deferred;
     const cls = task.completed ? 'completed' : isDef ? 'deferred' : hasFind ? 'finding' : '';
@@ -463,6 +470,7 @@ function subscrever() {
   }
   canalAtivo = sb.channel('tasks-rt-' + curAC.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'tasks',filter:`aircraft_id=eq.${curAC.id}`}, carregarTasks)
+      .on('postgres_changes',{event:'*',schema:'public',table:'aircrafts'}, carregarAeronaves)
     .on('postgres_changes',{event:'*',schema:'public',table:'observations'}, carregarTasks)
     .on('postgres_changes',{event:'*',schema:'public',table:'findings'}, carregarTasks)
     .subscribe();
@@ -588,6 +596,14 @@ function selecionarMotivo(btn, motivo) {
   document.querySelectorAll('.defer-reason-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   deferMotivoSel = motivo;
+  const obsInput = document.getElementById('defer-obs');
+  if(motivo === 'Outro'){
+    obsInput.placeholder = '⚠️ Descreva o motivo (obrigatório)';
+    obsInput.style.borderColor = '#f59e0b';
+  } else {
+    obsInput.placeholder = 'Observação adicional (opcional)';
+    obsInput.style.borderColor = '#334155';
+  }
 }
 
 async function confirmarDefer() {
